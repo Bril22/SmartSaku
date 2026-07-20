@@ -12,7 +12,7 @@ debt for the next 5–10 years. Data lives in Postgres (Neon); each user only se
 
 ## Screenshots
 
-*Amounts in the screenshots are randomized sample values.*
+*Screenshots show the built-in demo account (fictional data). Create it with `npm run seed:demo`, then log in as `demo@smartsaku.app` / `demo1234`.*
 
 ### Mobile (default experience)
 
