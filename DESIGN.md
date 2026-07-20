@@ -24,7 +24,7 @@ SmartSaku is a personal money manager and debt payoff app. The design is warm an
 - **Memorable thing:** "The warm money app that shows my debt-free date everywhere."
 
 ## Typography
-- **Display/Hero + big money numbers:** Fraunces (Google Fonts) — warm characterful serif, fits the organic palette.
+- **Display/Hero + big money numbers:** Bricolage Grotesque (Google Fonts) — warm, characterful sans; more app-like than the previous serif (Fraunces, replaced 2026-07-20 per owner request).
 - **Body/UI:** Plus Jakarta Sans — clean, friendly, designed for Jakarta (nice story for an Indonesian app).
 - **Data/amounts:** Plus Jakarta Sans or Fraunces with `font-variant-numeric: tabular-nums` — always.
 - **Loading:** Google Fonts via `next/font` (self-hosted at build).
@@ -93,3 +93,5 @@ SmartSaku is a personal money manager and debt payoff app. The design is warm an
 | 2026-07-20 | Initial design system | /design-consultation; palette provided by owner; research on YNAB/Copilot/Monefy/Debt Payoff Planner |
 | 2026-07-20 | Green scale #F0E491/#BBC863/#658C58/#31694E is the default primary palette | Owner request; deeper greens also improve text contrast |
 | 2026-07-20 | Desktop = full width with sidebar; two-column Home/Money, 2–3 col Debts grid | Owner feedback: desktop looked like a stretched phone |
+| 2026-07-20 | Display font Fraunces → Bricolage Grotesque | Owner wanted a font that suits the app better; serif numbers read too editorial |
+| 2026-07-20 | Feedback layer: toasts on every mutation; confetti on debt payment; "Lunas! 🎉" takeover on payoff; coin float on income | Owner request; motion stays functional (≤3s, non-blocking) |

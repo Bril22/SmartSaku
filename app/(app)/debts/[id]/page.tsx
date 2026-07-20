@@ -106,7 +106,16 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                   </button>
                 </form>
               ) : (
-                <span className="text-[11px] text-inksoft font-semibold px-2">upcoming</span>
+                <form action={payDebtMonth}>
+                  <input type="hidden" name="debtId" value={debt.id} />
+                  <input type="hidden" name="month" value={s.month.toISOString()} />
+                  <input type="hidden" name="amount" value={Number(s.planned)} />
+                  {defaultAccount && <input type="hidden" name="accountId" value={defaultAccount.id} />}
+                  <input type="hidden" name="backTo" value={`/debts/${debt.id}`} />
+                  <button className="border border-line text-inksoft rounded-full text-[11px] font-bold px-3 py-1.5 hover:border-sagedeep hover:text-sagedeep">
+                    Pay early
+                  </button>
+                </form>
               )}
             </div>
           );

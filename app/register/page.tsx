@@ -1,8 +1,15 @@
 import Link from "next/link";
-import { login } from "@/app/actions";
+import { register } from "@/app/actions";
 import SubmitButton from "@/components/SubmitButton";
 
-export default async function LoginPage({
+const ERRORS: Record<string, string> = {
+  email: "Please enter a valid email address.",
+  short: "Password must be at least 6 characters.",
+  match: "The two passwords do not match.",
+  exists: "An account with this email already exists. Try signing in.",
+};
+
+export default async function RegisterPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
@@ -13,15 +20,15 @@ export default async function LoginPage({
       <div className="w-full max-w-sm">
         <h1 className="font-display text-4xl font-bold text-center">SmartSaku</h1>
         <p className="text-inksoft text-center mt-2 mb-8 text-sm">
-          Your warm money manager. Sign in to continue.
+          Create your account — free, takes 10 seconds.
         </p>
         <form
-          action={login}
+          action={register}
           className="bg-card border border-line rounded-lg p-6 shadow-soft space-y-4"
         >
           {error && (
             <div className="bg-badbg text-bad rounded-md px-4 py-3 text-sm font-semibold">
-              Email or password is wrong. Please try again.
+              {ERRORS[error] ?? "Something went wrong. Please try again."}
             </div>
           )}
           <div>
@@ -47,21 +54,37 @@ export default async function LoginPage({
               name="password"
               type="password"
               required
-              autoComplete="current-password"
+              minLength={6}
+              autoComplete="new-password"
               className="w-full rounded-md border border-line bg-cream2 px-4 py-3 text-sm focus:outline-none focus:border-sagedeep"
-              placeholder="••••••••"
+              placeholder="at least 6 characters"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-inksoft mb-1.5" htmlFor="confirm">
+              Repeat password
+            </label>
+            <input
+              id="confirm"
+              name="confirm"
+              type="password"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className="w-full rounded-md border border-line bg-cream2 px-4 py-3 text-sm focus:outline-none focus:border-sagedeep"
+              placeholder="same password again"
             />
           </div>
           <SubmitButton
             className="w-full rounded-full bg-sagedeep text-cream2 font-bold py-3.5 text-sm hover:opacity-90"
-            pendingText="Signing in…"
+            pendingText="Creating account…"
           >
-            Sign in
+            Create account
           </SubmitButton>
           <p className="text-center text-xs text-inksoft">
-            New here?{" "}
-            <Link href="/register" className="text-sagedeep font-bold">
-              Create account
+            Already have an account?{" "}
+            <Link href="/login" className="text-sagedeep font-bold">
+              Sign in
             </Link>
           </p>
         </form>

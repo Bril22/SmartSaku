@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { addTransaction } from "@/app/actions";
+import SubmitButton from "@/components/SubmitButton";
 
 export default async function AddPage({
   searchParams,
@@ -98,9 +99,12 @@ export default async function AddPage({
           />
         </div>
 
-        <button className="w-full rounded-full bg-sagedeep text-cream2 font-bold py-4 text-sm">
+        <SubmitButton
+          className="w-full rounded-full bg-sagedeep text-cream2 font-bold py-4 text-sm"
+          pendingText="Saving…"
+        >
           Save ⚡
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );

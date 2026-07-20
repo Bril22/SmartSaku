@@ -31,6 +31,41 @@ export async function logout() {
   redirect("/login");
 }
 
+export async function register(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect("/register?error=email");
+  if (password.length < 6) redirect("/register?error=short");
+  if (password !== confirm) redirect("/register?error=match");
+  if (await prisma.user.findUnique({ where: { email } })) redirect("/register?error=exists");
+
+  const name = email.split("@")[0].replace(/^./, (c) => c.toUpperCase());
+  const user = await prisma.user.create({
+    data: { email, name, passwordHash: await bcrypt.hash(password, 10) },
+  });
+  // starter data so every screen works right away
+  await prisma.settings.create({ data: { userId: user.id } });
+  await prisma.finAccount.create({
+    data: { userId: user.id, name: "Cash", type: "CASH", balance: 0n },
+  });
+  await prisma.category.createMany({
+    data: (
+      [
+        { name: "Salary", type: "INCOME", icon: "💰" },
+        { name: "Food", type: "EXPENSE", icon: "🍜" },
+        { name: "Rent", type: "EXPENSE", icon: "🏠" },
+        { name: "Family", type: "EXPENSE", icon: "👨‍👩‍👧" },
+        { name: "Transport", type: "EXPENSE", icon: "🚌" },
+        { name: "Other", type: "EXPENSE", icon: "🧾" },
+      ] as const
+    ).map((c) => ({ userId: user.id, ...c })),
+  });
+  await createSession(user.id);
+  redirect("/?ok=" + encodeURIComponent(`Welcome to SmartSaku, ${name}! 🌱`));
+}
+
 /* ---------- money ---------- */
 
 export async function addTransaction(formData: FormData) {
@@ -56,7 +91,10 @@ export async function addTransaction(formData: FormData) {
   ]);
   revalidatePath("/");
   revalidatePath("/money");
-  redirect("/money");
+  if (direction === "IN") {
+    redirect("/money?ok=" + encodeURIComponent("Income recorded 💰") + "&fx=money");
+  }
+  redirect("/money?ok=" + encodeURIComponent("Expense saved"));
 }
 
 export async function addAccount(formData: FormData) {
@@ -67,7 +105,7 @@ export async function addAccount(formData: FormData) {
   if (!name) redirect("/money");
   await prisma.finAccount.create({ data: { userId, name, type, balance: BigInt(balance) } });
   revalidatePath("/money");
-  redirect("/money");
+  redirect("/money?ok=" + encodeURIComponent(`Account "${name}" created`));
 }
 
 export async function updateAccountBalance(formData: FormData) {
@@ -77,7 +115,7 @@ export async function updateAccountBalance(formData: FormData) {
   await prisma.finAccount.updateMany({ where: { id, userId }, data: { balance: BigInt(balance) } });
   revalidatePath("/money");
   revalidatePath("/");
-  redirect("/money");
+  redirect("/money?ok=" + encodeURIComponent("Balance updated"));
 }
 
 /* ---------- debts ---------- */
@@ -123,10 +161,26 @@ export async function payDebtMonth(formData: FormData) {
   }
   await prisma.$transaction(ops);
 
+  // detect full payoff for the big celebration
+  const [schedule, payments, adjustments] = await Promise.all([
+    prisma.debtScheduleEntry.aggregate({ where: { debtId }, _sum: { planned: true } }),
+    prisma.debtPayment.aggregate({ where: { debtId }, _sum: { amount: true } }),
+    prisma.debtAdjustment.aggregate({ where: { debtId }, _sum: { delta: true } }),
+  ]);
+  const remaining =
+    Number(schedule._sum.planned ?? 0n) +
+    Number(adjustments._sum.delta ?? 0n) -
+    Number(payments._sum.amount ?? 0n);
+  const lunas = remaining <= 0;
+  if (lunas) {
+    await prisma.debt.update({ where: { id: debtId }, data: { status: "PAID_OFF" } });
+  }
+
   revalidatePath("/");
   revalidatePath("/debts");
   revalidatePath(`/debts/${debtId}`);
-  redirect(backTo);
+  const msg = lunas ? `${debt.lender} is fully paid — LUNAS! 🎉` : `${debt.lender} payment recorded ✓`;
+  redirect(`${backTo}?ok=${encodeURIComponent(msg)}&fx=${lunas ? "lunas" : "paid"}`);
 }
 
 export async function adjustDebt(formData: FormData) {
@@ -142,7 +196,7 @@ export async function adjustDebt(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/debts");
   revalidatePath(`/debts/${debtId}`);
-  redirect(`/debts/${debtId}`);
+  redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Adjustment applied ⚖️"));
 }
 
 /* ---------- settings ---------- */
@@ -177,5 +231,5 @@ export async function updateSettings(formData: FormData) {
   });
   revalidatePath("/future");
   revalidatePath("/");
-  redirect("/future");
+  redirect("/future?ok=" + encodeURIComponent("Assumptions saved"));
 }

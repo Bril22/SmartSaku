@@ -25,7 +25,7 @@
   --color-bad: #c0563e;
   --color-badbg: #f6e2db;
 
-  --font-display: var(--font-fraunces), serif;
+  --font-display: var(--font-bricolage), sans-serif;
   --font-sans: var(--font-jakarta), sans-serif;
 
   --radius-sm: 8px;
@@ -43,4 +43,128 @@ body {
 
 .money {
   font-variant-numeric: tabular-nums;
+}
+
+/* micro-interactions */
+button,
+a {
+  transition:
+    transform 0.15s ease-out,
+    opacity 0.15s ease-out,
+    background-color 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+button:active,
+a:active {
+  transform: scale(0.96);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+.toast {
+  position: fixed;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  background: var(--color-ink);
+  color: var(--color-cream2);
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-size: 13.5px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(68, 58, 40, 0.35);
+  animation: toast-in 0.25s ease-out;
+  white-space: nowrap;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 768px) {
+  .toast {
+    bottom: 32px;
+  }
+}
+
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 80;
+  overflow: hidden;
+}
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-8vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(680deg);
+    opacity: 0.6;
+  }
+}
+.confetti {
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confetti-fall 2.4s ease-in forwards;
+}
+@keyframes coin-float {
+  0% {
+    transform: translateY(30vh) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-45vh) scale(1.15);
+    opacity: 0;
+  }
+}
+.coin {
+  position: absolute;
+  bottom: 0;
+  font-size: 26px;
+  animation: coin-float 1.8s ease-out forwards;
+}
+@keyframes pop-big {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.12);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+.lunas-banner {
+  position: fixed;
+  top: 42%;
+  left: 50%;
+  z-index: 85;
+  font-family: var(--font-display);
+  font-size: clamp(40px, 9vw, 72px);
+  font-weight: 800;
+  color: var(--color-sagedeep);
+  text-shadow: 0 4px 24px rgba(49, 105, 78, 0.35);
+  animation: pop-big 2.6s ease-out forwards;
+  pointer-events: none;
 }
