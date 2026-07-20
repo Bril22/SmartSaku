@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { addTransaction } from "@/app/actions";
+import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function AddPage({
@@ -11,7 +12,10 @@ export default async function AddPage({
   const userId = await requireUserId();
   const { error } = await searchParams;
   const [accounts, categories] = await Promise.all([
-    prisma.finAccount.findMany({ where: { userId }, orderBy: [{ createdAt: "asc" }, { name: "asc" }] }),
+    prisma.finAccount.findMany({
+      where: { userId, archived: false },
+      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+    }),
     prisma.category.findMany({ where: { userId }, orderBy: { name: "asc" } }),
   ]);
   const expenseCats = categories.filter((c) => c.type === "EXPENSE");
@@ -56,38 +60,25 @@ export default async function AddPage({
 
         <div>
           <label className="block text-xs font-semibold text-inksoft mb-1.5">Category</label>
-          <select name="categoryId" className="w-full rounded-md border border-line bg-card px-3 py-3 text-sm">
-            <option value="">— none —</option>
-            {expenseCats.length > 0 && (
-              <optgroup label="Expenses">
-                {expenseCats.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.icon} {c.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {incomeCats.length > 0 && (
-              <optgroup label="Income">
-                {incomeCats.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.icon} {c.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+          <Select
+            name="categoryId"
+            placeholder="No category"
+            options={[
+              { value: "", label: "No category" },
+              ...expenseCats.map((c) => ({ value: c.id, label: c.name, icon: c.icon })),
+              ...incomeCats.map((c) => ({ value: c.id, label: c.name, icon: c.icon })),
+            ]}
+          />
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-inksoft mb-1.5">Account</label>
-          <select name="accountId" required className="w-full rounded-md border border-line bg-card px-3 py-3 text-sm">
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            name="accountId"
+            required
+            defaultValue={accounts[0]?.id}
+            options={accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }))}
+          />
         </div>
 
         <div>

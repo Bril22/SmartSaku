@@ -12,16 +12,21 @@ export default function Toaster() {
   const [toast, setToast] = useState<string | null>(null);
   const [fx, setFx] = useState<string | null>(null);
 
+  const [isError, setIsError] = useState(false);
+
   useEffect(() => {
     const ok = searchParams.get("ok");
+    const err = searchParams.get("err");
     const fxParam = searchParams.get("fx");
-    if (!ok && !fxParam) return;
-    setToast(ok);
+    if (!ok && !err && !fxParam) return;
+    setToast(err ?? ok);
+    setIsError(!!err);
     setFx(fxParam);
 
-    // strip ok/fx from the URL, keep other params (e.g. ?years=10)
+    // strip toast params from the URL, keep other params (e.g. ?years=10)
     const rest = new URLSearchParams(searchParams.toString());
     rest.delete("ok");
+    rest.delete("err");
     rest.delete("fx");
     router.replace(rest.size ? `${pathname}?${rest}` : pathname, { scroll: false });
 
@@ -36,7 +41,11 @@ export default function Toaster() {
 
   return (
     <>
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div className="toast" style={isError ? { background: "#C0563E" } : undefined}>
+          {toast}
+        </div>
+      )}
 
       {fx === "lunas" && (
         <>

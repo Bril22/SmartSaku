@@ -38,6 +38,7 @@ model FinAccount {
   name      String
   type      AccountType
   balance   BigInt      @default(0)
+  archived  Boolean     @default(false)
   createdAt DateTime    @default(now())
 
   transactions Transaction[]
@@ -168,9 +169,16 @@ model MonthlySnapshot {
   @@unique([userId, month])
 }
 
+model ExchangeRate {
+  code       String   @id
+  ratePerIdr Float
+  fetchedAt  DateTime @default(now())
+}
+
 model Settings {
   userId        String @id
   user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency      String @default("IDR")
   monthlyIncome BigInt @default(0)
   livingRent    BigInt @default(0)
   livingFood    BigInt @default(0)

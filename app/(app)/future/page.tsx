@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { projectFuture } from "@/lib/finance";
-import { rpShort } from "@/lib/format";
+import { getDebtSummaries, projectFuture } from "@/lib/finance";
+import { getMoney } from "@/lib/money";
 import { updateSettings } from "@/app/actions";
 import { FutureChart } from "@/components/Charts";
 
@@ -15,14 +15,20 @@ export default async function FuturePage({
   const { years: yearsParam } = await searchParams;
   const years = yearsParam === "10" ? 10 : 5;
 
-  const [settings, points] = await Promise.all([
+  const [settings, points, money, debts] = await Promise.all([
     prisma.settings.findUnique({ where: { userId } }),
     projectFuture(userId, years),
+    getMoney(userId),
+    getDebtSummaries(userId),
   ]);
 
   const debtFreePoint = points.find((p) => p.debt <= 0);
   const last = points[points.length - 1];
   const lowest = points.reduce((a, p) => (p.savings < a.savings ? p : a), points[0]);
+  const netWorth = points[0] ? points[0].netWorth : 0;
+  const monthlyDebtPay = debts.reduce((a, d) => a + d.thisMonthPlanned, 0);
+  const income = Number(settings?.monthlyIncome ?? 0n);
+  const debtRatio = income > 0 ? Math.round((monthlyDebtPay / income) * 100) : 0;
 
   return (
     <div>
@@ -44,6 +50,21 @@ export default async function FuturePage({
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+        <div className="bg-card border border-line rounded-md p-3">
+          <div className="text-[10px] uppercase tracking-wide text-inksoft">Net worth today</div>
+          <div className={`font-display font-bold text-lg money mt-0.5 ${netWorth < 0 ? "text-bad" : "text-sagedeep"}`}>
+            {money.rp(netWorth)}
+          </div>
+        </div>
+        <div className="bg-card border border-line rounded-md p-3">
+          <div className="text-[10px] uppercase tracking-wide text-inksoft">Debt ratio (this month)</div>
+          <div className={`font-display font-bold text-lg money mt-0.5 ${debtRatio > 40 ? "text-bad" : ""}`}>
+            {debtRatio}%
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-3 gap-2.5 mb-4">
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Debt-free</div>
@@ -51,12 +72,12 @@ export default async function FuturePage({
         </div>
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Savings in {years}y</div>
-          <div className="font-extrabold text-[13px] money mt-1 text-sagedeep">{rpShort(last?.savings ?? 0)}</div>
+          <div className="font-extrabold text-[13px] money mt-1 text-sagedeep">{money.rpShort(last?.savings ?? 0)}</div>
         </div>
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Lowest point</div>
           <div className={`font-extrabold text-[13px] money mt-1 ${lowest && lowest.savings < 0 ? "text-bad" : ""}`}>
-            {rpShort(lowest?.savings ?? 0)}
+            {money.rpShort(lowest?.savings ?? 0)}
           </div>
         </div>
       </div>
@@ -72,7 +93,7 @@ export default async function FuturePage({
         <div className="text-[11px] uppercase tracking-wide text-inksoft mb-2">
           Savings vs debt — next {years} years
         </div>
-        <FutureChart data={points} />
+        <FutureChart data={points} code={money.code} ratePerIdr={money.ratePerIdr} symbol={money.symbol} />
       </div>
 
       <details className="bg-card border border-line rounded-lg p-4" open>

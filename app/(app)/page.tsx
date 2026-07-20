@@ -3,7 +3,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
-import { monthKey, monthLabel, rp, rpShort } from "@/lib/format";
+import { monthKey, monthLabel } from "@/lib/format";
+import { getMoney } from "@/lib/money";
 import { payDebtMonth } from "@/app/actions";
 
 export default async function HomePage() {
@@ -11,14 +12,18 @@ export default async function HomePage() {
   const now = monthKey();
   const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [user, accounts, debts, monthTx, bills] = await Promise.all([
+  const [user, accounts, debts, monthTx, bills, money] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
-    prisma.finAccount.findMany({ where: { userId }, orderBy: [{ createdAt: "asc" }, { name: "asc" }] }),
+    prisma.finAccount.findMany({
+      where: { userId, archived: false },
+      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+    }),
     getDebtSummaries(userId),
     prisma.transaction.findMany({
       where: { userId, date: { gte: now, lt: nextMonth } },
     }),
     prisma.recurringBill.findMany({ where: { userId, active: true } }),
+    getMoney(userId),
   ]);
 
   const totalSavings = accounts.reduce((a, x) => a + Number(x.balance), 0);
@@ -57,18 +62,27 @@ export default async function HomePage() {
 
       <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
       <div>
-      {/* hero */}
-      <div className="rounded-lg p-5 text-cream2 mb-4" style={{ background: "linear-gradient(135deg,#31694E,#658C58)" }}>
+      {/* hero with peeking mascot */}
+      <div className="relative">
+        <Image
+          src="/brand/mascot-wave.png"
+          alt=""
+          width={72}
+          height={118}
+          className="absolute -top-9 right-6 z-0 pointer-events-none"
+        />
+      </div>
+      <div className="relative z-10 rounded-lg p-5 text-cream2 mb-4" style={{ background: "linear-gradient(135deg,#31694E,#658C58)" }}>
         <div className="text-[11px] uppercase tracking-wider opacity-85">Total savings</div>
-        <div className="font-display text-3xl font-bold money mt-0.5 mb-3">{rp(totalSavings)}</div>
+        <div className="font-display text-3xl font-bold money mt-0.5 mb-3">{money.rp(totalSavings)}</div>
         <div className="flex gap-5 text-xs">
           <div>
             Debt left
-            <b className="block text-sm money">{rpShort(totalDebt)}</b>
+            <b className="block text-sm money">{money.rpShort(totalDebt)}</b>
           </div>
           <div>
             This month
-            <b className="block text-sm money">{rpShort(dueThisMonth.reduce((a, d) => a + d.thisMonthPlanned, 0))}</b>
+            <b className="block text-sm money">{money.rpShort(dueThisMonth.reduce((a, d) => a + d.thisMonthPlanned, 0))}</b>
           </div>
           <div>
             Debt-free
@@ -81,11 +95,11 @@ export default async function HomePage() {
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-card border border-line rounded-md p-3.5">
           <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Income ({monthLabel(now)})</div>
-          <div className="font-extrabold text-sagedeep money mt-1">+{rpShort(incomeThisMonth)}</div>
+          <div className="font-extrabold text-sagedeep money mt-1">+{money.rpShort(incomeThisMonth)}</div>
         </div>
         <div className="bg-card border border-line rounded-md p-3.5">
           <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Spent ({monthLabel(now)})</div>
-          <div className="font-extrabold text-peachdeep money mt-1">−{rpShort(spentThisMonth)}</div>
+          <div className="font-extrabold text-peachdeep money mt-1">−{money.rpShort(spentThisMonth)}</div>
         </div>
       </div>
 
@@ -100,7 +114,7 @@ export default async function HomePage() {
         {accounts.map((a) => (
           <div key={a.id} className="bg-card border border-line rounded-md p-3.5">
             <div className="text-[10.5px] uppercase tracking-wide text-inksoft">{a.name}</div>
-            <div className="font-extrabold money mt-1 text-[15px]">{rp(Number(a.balance))}</div>
+            <div className="font-extrabold money mt-1 text-[15px]">{money.rp(Number(a.balance))}</div>
           </div>
         ))}
       </div>
@@ -137,7 +151,7 @@ export default async function HomePage() {
               </Link>
               <span className="text-[11.5px] text-inksoft">{monthLabel(now)} installment</span>
             </div>
-            <div className="font-extrabold text-[13px] money whitespace-nowrap">{rpShort(d.thisMonthPlanned)}</div>
+            <div className="font-extrabold text-[13px] money whitespace-nowrap">{money.rpShort(d.thisMonthPlanned)}</div>
             {d.thisMonthStatus === "PAID" ? (
               <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">Paid</span>
             ) : (
@@ -162,7 +176,7 @@ export default async function HomePage() {
               <span className="font-bold text-[13.5px] block truncate">{b.name}</span>
               <span className="text-[11.5px] text-inksoft">due day {b.dueDay}</span>
             </div>
-            <div className="font-extrabold text-[13px] money whitespace-nowrap">{rpShort(Number(b.amount))}</div>
+            <div className="font-extrabold text-[13px] money whitespace-nowrap">{money.rpShort(Number(b.amount))}</div>
           </div>
         ))}
       </div>

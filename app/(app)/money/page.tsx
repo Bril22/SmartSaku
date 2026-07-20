@@ -1,21 +1,25 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { rp, rpShort } from "@/lib/format";
+import { getMoney } from "@/lib/money";
 import { addAccount, updateAccountBalance } from "@/app/actions";
 
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
 
 export default async function MoneyPage() {
   const userId = await requireUserId();
-  const [accounts, txs] = await Promise.all([
-    prisma.finAccount.findMany({ where: { userId }, orderBy: [{ createdAt: "asc" }, { name: "asc" }] }),
+  const [accounts, txs, money] = await Promise.all([
+    prisma.finAccount.findMany({
+      where: { userId, archived: false },
+      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+    }),
     prisma.transaction.findMany({
       where: { userId },
       include: { category: true, account: true },
       orderBy: { date: "desc" },
       take: 30,
     }),
+    getMoney(userId),
   ]);
   const total = accounts.reduce((a, x) => a + Number(x.balance), 0);
 
@@ -32,7 +36,7 @@ export default async function MoneyPage() {
       <div>
       <div className="bg-card border border-line rounded-lg p-4 mb-5 shadow-soft">
         <div className="text-[11px] uppercase tracking-wide text-inksoft">All accounts</div>
-        <div className="font-display text-2xl font-bold money mt-0.5">{rp(total)}</div>
+        <div className="font-display text-2xl font-bold money mt-0.5">{money.rp(total)}</div>
       </div>
 
       <h2 className="text-sm font-bold mb-2">Accounts</h2>
@@ -45,7 +49,7 @@ export default async function MoneyPage() {
                 <div className="font-bold text-[13.5px]">{a.name}</div>
                 <div className="text-[11px] text-inksoft">{a.type.toLowerCase()}</div>
               </div>
-              <div className="font-extrabold money text-[14px]">{rp(Number(a.balance))}</div>
+              <div className="font-extrabold money text-[14px]">{money.rp(Number(a.balance))}</div>
             </summary>
             <form action={updateAccountBalance} className="px-3.5 pb-3.5 flex gap-2 items-center">
               <input type="hidden" name="accountId" value={a.id} />
@@ -115,7 +119,7 @@ export default async function MoneyPage() {
               className={`font-extrabold money text-[13px] ${t.direction === "IN" ? "text-sagedeep" : "text-peachdeep"}`}
             >
               {t.direction === "IN" ? "+" : "−"}
-              {rpShort(Number(t.amount))}
+              {money.rpShort(Number(t.amount))}
             </div>
           </div>
         ))}

@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
-import { monthKey, monthLabel, rp, rpShort } from "@/lib/format";
+import { monthKey, monthLabel } from "@/lib/format";
+import { getMoney } from "@/lib/money";
 import { adjustDebt, payDebtMonth } from "@/app/actions";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,10 +19,13 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
   if (!debt) notFound();
 
   const now = monthKey();
-  const accounts = await prisma.finAccount.findMany({
-    where: { userId },
-    orderBy: [{ createdAt: "asc" }, { name: "asc" }],
-  });
+  const [accounts, money] = await Promise.all([
+    prisma.finAccount.findMany({
+      where: { userId, archived: false },
+      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+    }),
+    getMoney(userId),
+  ]);
   const defaultAccount = accounts[0];
 
   const totalPlanned = debt.schedule.reduce((a, s) => a + Number(s.planned), 0);
@@ -35,7 +39,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
     <div>
       <h1 className="font-display text-2xl font-semibold mb-1">{debt.lender}</h1>
       <p className="text-sm text-inksoft mb-4">
-        Remaining <b className="money text-ink">{rp(remaining)}</b>
+        Remaining <b className="money text-ink">{money.rp(remaining)}</b>
         {remaining <= 0 && <span className="text-good font-bold"> — Lunas! 🎉</span>}
       </p>
 
@@ -85,11 +89,11 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                 <div className="font-semibold text-[13px]">{monthLabel(s.month)}</div>
                 {p && (
                   <div className="text-[11px] text-inksoft">
-                    paid {rp(Number(p.amount))} on {p.paidDate.toLocaleDateString("id-ID")}
+                    paid {money.rp(Number(p.amount))} on {p.paidDate.toLocaleDateString("id-ID")}
                   </div>
                 )}
               </div>
-              <div className="font-extrabold money text-[13px]">{rpShort(Number(s.planned))}</div>
+              <div className="font-extrabold money text-[13px]">{money.rpShort(Number(s.planned))}</div>
               {p ? (
                 <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">
                   {p.status === "PAID" ? "Paid" : p.status.toLowerCase()}
@@ -134,7 +138,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                 </span>
                 <span className={`font-extrabold money ${Number(a.delta) < 0 ? "text-good" : "text-bad"}`}>
                   {Number(a.delta) > 0 ? "+" : ""}
-                  {rpShort(Number(a.delta))}
+                  {money.rpShort(Number(a.delta))}
                 </span>
               </div>
             ))}

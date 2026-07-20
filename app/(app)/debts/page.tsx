@@ -2,12 +2,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
-import { monthKey, monthLabel, rpShort } from "@/lib/format";
+import { monthKey, monthLabel } from "@/lib/format";
+import { getMoney } from "@/lib/money";
 import { DebtCurve } from "@/components/Charts";
 
 export default async function DebtsPage() {
   const userId = await requireUserId();
-  const debts = await getDebtSummaries(userId);
+  const [debts, money] = await Promise.all([getDebtSummaries(userId), getMoney(userId)]);
   const totalRemaining = debts.reduce((a, d) => a + d.remaining, 0);
 
   // debt remaining curve from future schedule entries
@@ -36,10 +37,10 @@ export default async function DebtsPage() {
       <div className="bg-card border border-line rounded-lg p-4 mb-4 shadow-soft">
         <div className="flex items-baseline justify-between mb-1">
           <div className="text-[11px] uppercase tracking-wide text-inksoft">Total remaining</div>
-          <div className="font-extrabold money text-peachdeep">{rpShort(totalRemaining)}</div>
+          <div className="font-extrabold money text-peachdeep">{money.rpShort(totalRemaining)}</div>
         </div>
         {curve.length > 0 ? (
-          <DebtCurve data={curve} />
+          <DebtCurve data={curve} code={money.code} ratePerIdr={money.ratePerIdr} symbol={money.symbol} />
         ) : (
           <div className="text-sm text-good font-bold py-6 text-center">Lunas! You are debt-free 🎉</div>
         )}
@@ -59,7 +60,7 @@ export default async function DebtsPage() {
                   {d.lender} {done && <span className="text-good">✓</span>}
                 </span>
                 <span className={`money ${done ? "text-good" : ""}`}>
-                  {done ? "Lunas!" : rpShort(d.remaining)}
+                  {done ? "Lunas!" : money.rpShort(d.remaining)}
                 </span>
               </div>
               <div className="flex justify-between text-[11.5px] text-inksoft mb-2">

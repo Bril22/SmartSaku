@@ -80,6 +80,9 @@ export default function TabBar() {
         >
           <PlusIcon /> Quick add
         </Link>
+        <div className="mt-auto flex justify-center pb-2">
+          <Image src="/brand/mascot-sorting.png" alt="Saku-Kun sorting coins" width={150} height={105} />
+        </div>
       </aside>
     </>
   );
