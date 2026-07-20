@@ -256,6 +256,131 @@ export async function adjustDebt(formData: FormData) {
   redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Adjustment applied ⚖️"));
 }
 
+const DEBT_COLORS = ["#C96F4A", "#31694E", "#BBC863", "#827148", "#E8A07C", "#658C58", "#C79A3D"];
+
+export async function addDebt(formData: FormData) {
+  const userId = await requireUser();
+  const lender = String(formData.get("lender") ?? "").trim();
+  const total = Math.abs(Math.round(Number(formData.get("total") ?? 0)));
+  const monthly = Math.abs(Math.round(Number(formData.get("monthly") ?? 0)));
+  const startRaw = String(formData.get("start") ?? "");
+  if (!lender || !total || !monthly) {
+    redirect("/money?tab=debts&err=" + encodeURIComponent("Please fill name, total, and monthly amount"));
+  }
+  const exists = await prisma.debt.findFirst({ where: { userId, lender } });
+  if (exists) {
+    redirect("/money?tab=debts&err=" + encodeURIComponent(`"${lender}" already exists`));
+  }
+  const now = new Date();
+  const [sy, sm] = startRaw.split("-").map(Number);
+  const start = sy && sm ? new Date(Date.UTC(sy, sm - 1, 1)) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const count = await prisma.debt.count({ where: { userId } });
+  const debt = await prisma.debt.create({
+    data: { userId, lender, color: DEBT_COLORS[count % DEBT_COLORS.length] },
+  });
+  const rows = [];
+  let left = total;
+  for (let i = 0; i < 120 && left > 0; i++) {
+    const planned = Math.min(monthly, left);
+    rows.push({
+      debtId: debt.id,
+      month: new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1)),
+      planned: BigInt(planned),
+    });
+    left -= planned;
+  }
+  if (left > 0 && rows.length > 0) {
+    rows[rows.length - 1].planned += BigInt(left);
+  }
+  await prisma.debtScheduleEntry.createMany({ data: rows });
+  revalidatePath("/", "layout");
+  redirect(
+    `/debts/${debt.id}?ok=` +
+      encodeURIComponent(`"${lender}" added — ${rows.length} monthly payments scheduled`),
+  );
+}
+
+export async function updateScheduleEntry(formData: FormData) {
+  const userId = await requireUser();
+  const entryId = String(formData.get("entryId") ?? "");
+  const planned = Math.abs(Math.round(Number(formData.get("planned") ?? 0)));
+  const entry = await prisma.debtScheduleEntry.findFirst({
+    where: { id: entryId, debt: { userId } },
+  });
+  if (!entry) redirect("/money?tab=debts");
+  if (!planned) {
+    redirect(`/debts/${entry!.debtId}?err=` + encodeURIComponent("Amount must be above zero — use Remove month instead"));
+  }
+  await prisma.debtScheduleEntry.update({ where: { id: entryId }, data: { planned: BigInt(planned) } });
+  revalidatePath("/", "layout");
+  redirect(`/debts/${entry!.debtId}?ok=` + encodeURIComponent("Installment updated — forecast recalculated"));
+}
+
+export async function deleteScheduleEntry(formData: FormData) {
+  const userId = await requireUser();
+  const entryId = String(formData.get("entryId") ?? "");
+  const entry = await prisma.debtScheduleEntry.findFirst({
+    where: { id: entryId, debt: { userId } },
+  });
+  if (!entry) redirect("/money?tab=debts");
+  await prisma.debtScheduleEntry.delete({ where: { id: entryId } });
+  revalidatePath("/", "layout");
+  redirect(`/debts/${entry!.debtId}?ok=` + encodeURIComponent("Month removed from the schedule"));
+}
+
+export async function addScheduleEntry(formData: FormData) {
+  const userId = await requireUser();
+  const debtId = String(formData.get("debtId") ?? "");
+  const planned = Math.abs(Math.round(Number(formData.get("planned") ?? 0)));
+  const monthRaw = String(formData.get("month") ?? "");
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  const [y, m] = monthRaw.split("-").map(Number);
+  if (!debt || !planned || !y || !m) {
+    redirect(`/debts/${debtId}?err=` + encodeURIComponent("Please pick a month and an amount"));
+  }
+  const month = new Date(Date.UTC(y!, m! - 1, 1));
+  const exists = await prisma.debtScheduleEntry.findFirst({ where: { debtId, month } });
+  if (exists) {
+    redirect(`/debts/${debtId}?err=` + encodeURIComponent("That month is already scheduled — edit it instead"));
+  }
+  await prisma.debtScheduleEntry.create({ data: { debtId, month, planned: BigInt(planned) } });
+  revalidatePath("/", "layout");
+  redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Month added to the schedule"));
+}
+
+export async function renameDebt(formData: FormData) {
+  const userId = await requireUser();
+  const debtId = String(formData.get("debtId") ?? "");
+  const lender = String(formData.get("lender") ?? "").trim();
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  if (!debt) redirect("/money?tab=debts");
+  if (!lender) {
+    redirect(`/debts/${debtId}?err=` + encodeURIComponent("Name cannot be empty"));
+  }
+  const conflict = await prisma.debt.findFirst({
+    where: { userId, lender, NOT: { id: debtId } },
+  });
+  if (conflict) {
+    redirect(`/debts/${debtId}?err=` + encodeURIComponent(`"${lender}" already exists`));
+  }
+  await prisma.debt.update({ where: { id: debtId }, data: { lender } });
+  revalidatePath("/", "layout");
+  redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Debt renamed"));
+}
+
+export async function deleteDebt(formData: FormData) {
+  const userId = await requireUser();
+  const debtId = String(formData.get("debtId") ?? "");
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  if (!debt) redirect("/money?tab=debts");
+  await prisma.debt.delete({ where: { id: debtId } });
+  revalidatePath("/", "layout");
+  redirect(
+    "/money?tab=debts&ok=" +
+      encodeURIComponent(`"${debt!.lender}" deleted — past bank transactions are kept`),
+  );
+}
+
 export async function updateDebtPayment(formData: FormData) {
   const userId = await requireUser();
   const paymentId = String(formData.get("paymentId") ?? "");

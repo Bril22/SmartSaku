@@ -4,13 +4,19 @@ import { requireUserId } from "@/lib/auth";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import {
+  addScheduleEntry,
   adjustDebt,
+  deleteDebt,
   deleteDebtAdjustment,
   deleteDebtPayment,
+  deleteScheduleEntry,
   payDebtMonth,
+  renameDebt,
   updateDebtPayment,
+  updateScheduleEntry,
 } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
+import Popover from "@/components/Popover";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const userId = await requireUserId();
@@ -44,7 +50,16 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold mb-1">{debt.lender}</h1>
+      <form action={renameDebt} className="flex items-center gap-2 mb-1">
+        <input type="hidden" name="debtId" value={debt.id} />
+        <input
+          name="lender"
+          defaultValue={debt.lender}
+          maxLength={40}
+          className="font-display text-2xl font-semibold bg-transparent border-b border-transparent focus:border-line focus:outline-none flex-1 min-w-0"
+        />
+        <button className="text-[11px] font-extrabold text-sagedeep shrink-0">Rename</button>
+      </form>
       <p className="text-sm text-inksoft mb-4">
         Remaining <b className="money text-ink">{money.rp(remaining)}</b>
         {remaining <= 0 && <span className="text-good font-bold"> — Lunas! 🎉</span>}
@@ -100,36 +115,66 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </div>
-              <div className="font-extrabold money text-[13px]">{money.rpShort(Number(s.planned))}</div>
+              <Popover
+                trigger={money.rpShort(Number(s.planned))}
+                triggerClass="font-extrabold money text-[13px] border-b border-dashed border-earth/50"
+              >
+                <form action={updateScheduleEntry} className="space-y-2">
+                  <input type="hidden" name="entryId" value={s.id} />
+                  <label className="block text-[10.5px] font-bold text-inksoft">
+                    Planned installment for {monthLabel(s.month)}
+                  </label>
+                  <MoneyInput
+                    name="planned"
+                    required
+                    defaultValue={Number(s.planned)}
+                    className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
+                  />
+                  <button className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2">
+                    Update installment
+                  </button>
+                </form>
+                <form action={deleteScheduleEntry}>
+                  <input type="hidden" name="entryId" value={s.id} />
+                  <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
+                    Remove month
+                  </button>
+                </form>
+              </Popover>
               {p ? (
-                <details className="relative">
-                  <summary className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5 cursor-pointer list-none">
-                    Paid ▾
-                  </summary>
-                  <div className="absolute right-0 z-30 mt-1.5 w-60 bg-card border border-line rounded-md p-3 shadow-soft space-y-2">
-                    <form action={updateDebtPayment} className="space-y-2">
-                      <input type="hidden" name="paymentId" value={p.id} />
-                      <label className="block text-[10.5px] font-bold text-inksoft">
-                        Paid amount
-                      </label>
-                      <MoneyInput
-                        name="amount"
-                        required
-                        defaultValue={Number(p.amount)}
-                        className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
-                      />
-                      <button className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2">
-                        Update payment
-                      </button>
-                    </form>
-                    <form action={deleteDebtPayment}>
-                      <input type="hidden" name="paymentId" value={p.id} />
-                      <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
-                        Remove payment
-                      </button>
-                    </form>
+                <Popover
+                  trigger="Paid ▾"
+                  triggerClass="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                >
+                  <div className="text-[10.5px] font-bold text-inksoft uppercase tracking-wide">
+                    Status
                   </div>
-                </details>
+                  <div className="flex items-center gap-2 text-[12.5px] font-bold text-good">
+                    ✓ Paid
+                  </div>
+                  <form action={updateDebtPayment} className="space-y-2">
+                    <input type="hidden" name="paymentId" value={p.id} />
+                    <label className="block text-[10.5px] font-bold text-inksoft">Paid amount</label>
+                    <MoneyInput
+                      name="amount"
+                      required
+                      defaultValue={Number(p.amount)}
+                      className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
+                    />
+                    <button className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2">
+                      Update payment
+                    </button>
+                  </form>
+                  <form action={deleteDebtPayment}>
+                    <input type="hidden" name="paymentId" value={p.id} />
+                    <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
+                      Mark as unpaid
+                    </button>
+                  </form>
+                  <p className="text-[10px] text-inksoft">
+                    Unpaid returns the money to your account and reopens this month.
+                  </p>
+                </Popover>
               ) : isPast || isCurrent ? (
                 <form action={payDebtMonth}>
                   <input type="hidden" name="debtId" value={debt.id} />
@@ -158,6 +203,36 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         })}
       </div>
 
+      <details className="mb-6 max-w-md">
+        <summary className="text-xs font-bold text-sagedeep cursor-pointer">
+          + Add a month to the schedule
+        </summary>
+        <form action={addScheduleEntry} className="bg-card border border-line rounded-md p-3.5 mt-2 flex gap-2 items-end">
+          <input type="hidden" name="debtId" value={debt.id} />
+          <div className="flex-1">
+            <label className="block text-[11px] font-semibold text-inksoft mb-1">Month</label>
+            <input
+              type="month"
+              name="month"
+              required
+              className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-[11px] font-semibold text-inksoft mb-1">Amount</label>
+            <MoneyInput
+              name="planned"
+              required
+              placeholder="1,100,000"
+              className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+            />
+          </div>
+          <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-4 py-2.5 shrink-0">
+            Add
+          </button>
+        </form>
+      </details>
+
       {/* adjustments history */}
       {debt.adjustments.length > 0 && (
         <>
@@ -184,6 +259,20 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
           </div>
         </>
       )}
+
+      <details className="bg-badbg border border-bad/30 rounded-lg p-4 mt-6 max-w-md">
+        <summary className="text-sm font-bold text-bad cursor-pointer">⚠️ Delete this debt</summary>
+        <form action={deleteDebt} className="mt-3">
+          <input type="hidden" name="debtId" value={debt.id} />
+          <p className="text-[12.5px] text-bad mb-2.5">
+            Removes the debt with its whole schedule, payments, and adjustments. Bank transactions
+            you already made are kept. This cannot be undone.
+          </p>
+          <button className="rounded-full bg-bad text-white text-xs font-extrabold px-5 py-2.5">
+            Delete {debt.lender} forever
+          </button>
+        </form>
+      </details>
     </div>
   );
 }

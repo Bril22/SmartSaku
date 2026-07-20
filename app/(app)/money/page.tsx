@@ -4,7 +4,7 @@ import { requireUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
-import { addAccount, updateAccountBalance } from "@/app/actions";
+import { addAccount, addDebt, updateAccountBalance } from "@/app/actions";
 import CalendarHistory, { type CalTx } from "@/components/CalendarHistory";
 import CategoryPie, { type PieSlice } from "@/components/CategoryPie";
 import { DebtCurve } from "@/components/Charts";
@@ -394,9 +394,55 @@ async function DebtsTab({ userId, money }: { userId: string; money: MoneyCtx }) 
           );
         })}
       </div>
+      <details className="mt-4 max-w-md">
+        <summary className="text-xs font-bold text-sagedeep cursor-pointer">+ Add debt</summary>
+        <form action={addDebt} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2.5">
+          <input
+            name="lender"
+            required
+            maxLength={40}
+            placeholder="Lender name (e.g. KTA Bank Biru)"
+            className="w-full rounded-md border border-line bg-cream2 px-3.5 py-2.5 text-sm"
+          />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] font-semibold text-inksoft mb-1">Total remaining</label>
+              <MoneyInput
+                name="total"
+                required
+                placeholder="12,000,000"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-inksoft mb-1">Monthly payment</label>
+              <MoneyInput
+                name="monthly"
+                required
+                placeholder="1,000,000"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-inksoft mb-1">First payment month</label>
+            <input
+              type="month"
+              name="start"
+              className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
+            />
+          </div>
+          <SubmitButton
+            className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+            pendingText="Adding…"
+          >
+            Add debt
+          </SubmitButton>
+        </form>
+      </details>
       <p className="text-[11.5px] text-inksoft mt-3">
-        Open a debt to see every month&apos;s payment, edit or remove payments, and adjust the
-        balance — the forecast updates automatically.
+        Open a debt to see every month&apos;s payment, edit or remove payments, rename it, and
+        adjust the balance — the forecast updates automatically.
       </p>
     </div>
   );
