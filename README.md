@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SmartSaku 🌱
 
-## Getting Started
+Personal money manager + debt payoff app. Warm, calm, mobile-first. All amounts in IDR.
 
-First, run the development server:
+## Human-friendly overview
+
+SmartSaku tracks your bank accounts, income and expenses, and your loan payoff schedules.
+Each month you mark which installments you paid, and the app projects your savings and
+debt for the next 5–10 years. Data lives in Postgres (Neon); each user only sees their own data.
+
+---
+
+## Stack
+
+- Next.js 16 (App Router, Turbopack) + TypeScript
+- Tailwind CSS v4 (design tokens in `app/globals.css`, full system in `DESIGN.md`)
+- Prisma 6 + PostgreSQL (Neon)
+- Auth: email + password, JWT cookie sessions (jose + bcryptjs)
+- Charts: recharts
+
+## Local development
 
 ```bash
+npm install
+cp .env.example .env   # fill in the values (see below)
+npx prisma db push     # create tables
+npm run seed           # baseline data + first user
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Name | Required | What it is |
+|---|---|---|
+| `DATABASE_URL` | yes | Neon Postgres connection string (`postgresql://...?sslmode=require&channel_binding=require`) |
+| `AUTH_SECRET` | yes | Long random string that signs session cookies. Generate one: `openssl rand -base64 32` |
+| `SEED_USER_PASSWORD` | only for seeding | Password given to the seed user by `npm run seed` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy to Vercel
 
-## Learn More
+1. Import this repo in Vercel (framework preset: Next.js — detected automatically).
+2. Add the environment variables above (`DATABASE_URL`, `AUTH_SECRET`) for Production.
+3. Deploy. The database schema must already exist — run `npx prisma db push` and
+   `npm run seed` once from your machine (they run against Neon directly).
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`postinstall` runs `prisma generate`, so builds work on Vercel without extra config.
