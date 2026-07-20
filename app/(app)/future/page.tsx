@@ -5,6 +5,7 @@ import { getDebtSummaries, projectFuture } from "@/lib/finance";
 import { getMoney } from "@/lib/money";
 import { updateSettings } from "@/app/actions";
 import { FutureChart } from "@/components/Charts";
+import MoneyInput from "@/components/MoneyInput";
 
 export default async function FuturePage({
   searchParams,
@@ -99,12 +100,12 @@ export default async function FuturePage({
       <details className="bg-card border border-line rounded-lg p-4" open>
         <summary className="text-sm font-bold cursor-pointer">Assumptions (income, living, growth)</summary>
         <form action={updateSettings} className="mt-3 space-y-3">
-          <Field label="Monthly income (Rp)" name="monthlyIncome" value={Number(settings?.monthlyIncome ?? 0)} />
+          <Field label="Monthly income (Rp)" name="monthlyIncome" value={Number(settings?.monthlyIncome ?? 0)} money />
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Rent / month" name="livingRent" value={Number(settings?.livingRent ?? 0)} />
-            <Field label="Food / month" name="livingFood" value={Number(settings?.livingFood ?? 0)} />
-            <Field label="Family / month" name="livingFamily" value={Number(settings?.livingFamily ?? 0)} />
-            <Field label="Other / month" name="livingOther" value={Number(settings?.livingOther ?? 0)} />
+            <Field label="Rent / month" name="livingRent" value={Number(settings?.livingRent ?? 0)} money />
+            <Field label="Food / month" name="livingFood" value={Number(settings?.livingFood ?? 0)} money />
+            <Field label="Family / month" name="livingFamily" value={Number(settings?.livingFamily ?? 0)} money />
+            <Field label="Other / month" name="livingOther" value={Number(settings?.livingOther ?? 0)} money />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Salary growth %/yr" name="salaryGrowthPct" value={settings?.salaryGrowthPct ?? 5} step="0.5" />
@@ -126,22 +127,23 @@ function Field({
   name,
   value,
   step,
+  money,
 }: {
   label: string;
   name: string;
   value: number;
   step?: string;
+  money?: boolean;
 }) {
+  const className = "w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money";
   return (
     <div>
       <label className="block text-[11px] font-semibold text-inksoft mb-1">{label}</label>
-      <input
-        name={name}
-        type="number"
-        step={step ?? "1"}
-        defaultValue={value}
-        className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
-      />
+      {money ? (
+        <MoneyInput name={name} defaultValue={value} className={className} />
+      ) : (
+        <input name={name} type="number" step={step ?? "1"} defaultValue={value} className={className} />
+      )}
     </div>
   );
 }

@@ -68,7 +68,7 @@ export function makeMoney(code: string, ratePerIdr: number, stale: boolean): Mon
     const v = Number(idr) * ratePerIdr;
     return (
       symbol +
-      v.toLocaleString(code === "IDR" ? "id-ID" : "en-US", {
+      v.toLocaleString("en-US", {
         minimumFractionDigits: 0,
         maximumFractionDigits: decimals,
       })

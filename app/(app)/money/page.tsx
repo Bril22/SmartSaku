@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getMoney } from "@/lib/money";
 import { addAccount, updateAccountBalance } from "@/app/actions";
+import MoneyInput from "@/components/MoneyInput";
 
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
 
@@ -53,12 +54,13 @@ export default async function MoneyPage() {
             </summary>
             <form action={updateAccountBalance} className="px-3.5 pb-3.5 flex gap-2 items-center">
               <input type="hidden" name="accountId" value={a.id} />
-              <input
-                name="balance"
-                type="number"
-                defaultValue={Number(a.balance)}
-                className="flex-1 rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
-              />
+              <div className="flex-1">
+                <MoneyInput
+                  name="balance"
+                  defaultValue={Number(a.balance)}
+                  className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
+                />
+              </div>
               <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-4 py-2">
                 Set balance
               </button>
@@ -83,12 +85,13 @@ export default async function MoneyPage() {
               <option value="EWALLET">E-wallet</option>
               <option value="CASH">Cash</option>
             </select>
-            <input
-              name="balance"
-              type="number"
-              placeholder="Balance"
-              className="flex-1 rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right"
-            />
+            <div className="flex-1">
+              <MoneyInput
+                name="balance"
+                placeholder="Balance"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right"
+              />
+            </div>
           </div>
           <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-4 py-2">Create</button>
         </form>

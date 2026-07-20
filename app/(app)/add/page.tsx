@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { addTransaction } from "@/app/actions";
+import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 
@@ -47,13 +48,10 @@ export default async function AddPage({
 
         <div>
           <label className="block text-xs font-semibold text-inksoft mb-1.5">Amount (Rp)</label>
-          <input
+          <MoneyInput
             name="amount"
-            type="number"
-            inputMode="numeric"
             required
-            min={1}
-            placeholder="85000"
+            placeholder="85,000"
             className="w-full rounded-md border border-line bg-card px-4 py-4 text-2xl font-display font-bold text-center money focus:outline-none focus:border-sagedeep"
           />
         </div>

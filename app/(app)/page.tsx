@@ -69,7 +69,7 @@ export default async function HomePage() {
           alt=""
           width={72}
           height={118}
-          className="absolute -top-9 right-6 z-0 pointer-events-none"
+          className="absolute -top-14 md:right-6 right-45 z-0 pointer-events-none"
         />
       </div>
       <div className="relative z-10 rounded-lg p-5 text-cream2 mb-4" style={{ background: "linear-gradient(135deg,#31694E,#658C58)" }}>

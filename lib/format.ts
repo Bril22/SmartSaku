@@ -1,6 +1,6 @@
 export function rp(n: number | bigint): string {
   const v = Math.round(Number(n));
-  return "Rp" + v.toLocaleString("id-ID");
+  return "Rp" + v.toLocaleString("en-US");
 }
 
 export function rpShort(n: number | bigint): string {

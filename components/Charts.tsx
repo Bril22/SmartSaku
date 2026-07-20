@@ -26,7 +26,7 @@ function makeFmt({ code = "IDR", ratePerIdr = 1, symbol = "Rp" }: CurrencyProps)
     const v = idr * ratePerIdr;
     return (
       symbol +
-      v.toLocaleString(code === "IDR" ? "id-ID" : "en-US", {
+      v.toLocaleString("en-US", {
         maximumFractionDigits: code === "IDR" || code === "JPY" ? 0 : 2,
       })
     );

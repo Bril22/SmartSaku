@@ -4,6 +4,7 @@ import { requireUserId } from "@/lib/auth";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import { adjustDebt, payDebtMonth } from "@/app/actions";
+import MoneyInput from "@/components/MoneyInput";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const userId = await requireUserId();
@@ -51,13 +52,13 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         <form action={adjustDebt} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2">
           <input type="hidden" name="debtId" value={debt.id} />
           <label className="block text-xs text-inksoft">
-            Amount in Rp. Positive = debt increased, negative = debt decreased (e.g. -500000).
+            Amount in Rp. Positive = debt increased, negative = debt decreased (e.g. -500,000).
           </label>
-          <input
+          <MoneyInput
             name="delta"
-            type="number"
             required
-            placeholder="-500000"
+            allowNegative
+            placeholder="-500,000"
             className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
           />
           <input
