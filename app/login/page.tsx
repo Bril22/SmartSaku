@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { login } from "@/app/actions";
 import SubmitButton from "@/components/SubmitButton";
@@ -11,6 +12,14 @@ export default async function LoginPage({
   return (
     <main className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
+        <Image
+          src="/brand/mascot-hero.png"
+          alt="Saku-Kun, the SmartSaku mascot"
+          width={120}
+          height={154}
+          priority
+          className="mx-auto mb-3 drop-shadow-sm"
+        />
         <h1 className="font-display text-4xl font-bold text-center">SmartSaku</h1>
         <p className="text-inksoft text-center mt-2 mb-8 text-sm">
           Your warm money manager. Sign in to continue.

@@ -1,9 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel, rp, rpShort } from "@/lib/format";
-import { payDebtMonth, logout } from "@/app/actions";
+import { payDebtMonth } from "@/app/actions";
 
 export default async function HomePage() {
   const userId = await requireUserId();
@@ -40,14 +41,18 @@ export default async function HomePage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <div>
-          <div className="text-xs text-inksoft">Selamat datang ☀️</div>
+          <div className="text-xs text-inksoft">Welcome back ☀️</div>
           <div className="font-display text-xl font-semibold">{user?.name ?? "there"}</div>
         </div>
-        <form action={logout}>
-          <button className="w-9 h-9 rounded-full bg-sage text-white font-extrabold text-sm" title="Sign out">
-            {(user?.name ?? "U")[0]}
-          </button>
-        </form>
+        <Link href="/settings" title="Settings">
+          <Image
+            src="/brand/mascot-abacus.png"
+            alt="Settings"
+            width={40}
+            height={40}
+            className="rounded-full border-2 border-sage bg-cream2 object-cover"
+          />
+        </Link>
       </div>
 
       <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">

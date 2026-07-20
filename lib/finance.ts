@@ -16,24 +16,43 @@ export type DebtSummary = {
 };
 
 export async function getDebtSummaries(userId: string): Promise<DebtSummary[]> {
-  const debts = await prisma.debt.findMany({
-    where: { userId },
-    include: { schedule: true, payments: true, adjustments: true },
-    orderBy: { lender: "asc" },
-  });
   const now = monthKey();
+  const [debts, planned, paid, adjusted, thisMonthEntries, thisMonthPayments] = await Promise.all([
+    prisma.debt.findMany({ where: { userId }, orderBy: { lender: "asc" } }),
+    prisma.debtScheduleEntry.groupBy({
+      by: ["debtId"],
+      where: { debt: { userId }, planned: { gt: 0 } },
+      _sum: { planned: true },
+      _max: { month: true },
+    }),
+    prisma.debtPayment.groupBy({
+      by: ["debtId"],
+      where: { debt: { userId } },
+      _sum: { amount: true },
+    }),
+    prisma.debtAdjustment.groupBy({
+      by: ["debtId"],
+      where: { debt: { userId } },
+      _sum: { delta: true },
+    }),
+    prisma.debtScheduleEntry.findMany({ where: { debt: { userId }, month: now } }),
+    prisma.debtPayment.findMany({ where: { debt: { userId }, month: now } }),
+  ]);
+
+  const plannedBy = new Map(planned.map((p) => [p.debtId, p]));
+  const paidBy = new Map(paid.map((p) => [p.debtId, Number(p._sum.amount ?? 0n)]));
+  const adjBy = new Map(adjusted.map((a) => [a.debtId, Number(a._sum.delta ?? 0n)]));
+  const entryBy = new Map(thisMonthEntries.map((e) => [e.debtId, Number(e.planned)]));
+  const paymentBy = new Map(thisMonthPayments.map((p) => [p.debtId, p]));
+
   return debts.map((d) => {
-    const totalPlanned = d.schedule.reduce((a, s) => a + Number(s.planned), 0);
-    const totalPaid = d.payments.reduce((a, p) => a + Number(p.amount), 0);
-    const adjustments = d.adjustments.reduce((a, x) => a + Number(x.delta), 0);
+    const totalPlanned = Number(plannedBy.get(d.id)?._sum.planned ?? 0n);
+    const totalPaid = paidBy.get(d.id) ?? 0;
+    const adjustments = adjBy.get(d.id) ?? 0;
     const remaining = Math.max(0, totalPlanned + adjustments - totalPaid);
-    const withPlanned = d.schedule.filter((s) => Number(s.planned) > 0);
-    const finishMonth = withPlanned.length
-      ? withPlanned.reduce((a, s) => (s.month > a ? s.month : a), withPlanned[0].month)
-      : null;
-    const thisEntry = d.schedule.find((s) => s.month.getTime() === now.getTime());
-    const thisMonthPlanned = thisEntry ? Number(thisEntry.planned) : 0;
-    const thisPayment = d.payments.find((p) => p.month.getTime() === now.getTime());
+    const finishMonth = plannedBy.get(d.id)?._max.month ?? null;
+    const thisMonthPlanned = entryBy.get(d.id) ?? 0;
+    const thisPayment = paymentBy.get(d.id);
     const thisMonthStatus = thisPayment
       ? thisPayment.status
       : thisMonthPlanned > 0

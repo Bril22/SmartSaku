@@ -94,7 +94,7 @@ export default async function AddPage({
           <label className="block text-xs font-semibold text-inksoft mb-1.5">Note (optional)</label>
           <input
             name="note"
-            placeholder="nasi goreng, grab, etc."
+            placeholder="lunch, transport, etc."
             className="w-full rounded-md border border-line bg-card px-3 py-3 text-sm"
           />
         </div>
@@ -103,7 +103,7 @@ export default async function AddPage({
           className="w-full rounded-full bg-sagedeep text-cream2 font-bold py-4 text-sm"
           pendingText="Saving…"
         >
-          Save ⚡
+          Save
         </SubmitButton>
       </form>
     </div>

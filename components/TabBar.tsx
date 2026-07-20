@@ -1,14 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const tabs = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/money", label: "Money", icon: "💳" },
-  { href: "/debts", label: "Debts", icon: "📉" },
-  { href: "/future", label: "Future", icon: "🌱" },
+  { href: "/", label: "Home", icon: "/brand/icon-home.png" },
+  { href: "/money", label: "Money", icon: "/brand/icon-money.png" },
+  { href: "/debts", label: "Debts", icon: "/brand/icon-debt-rate.png" },
+  { href: "/future", label: "Future", icon: "/brand/icon-future.png" },
 ];
 
 function PlusIcon() {
@@ -67,7 +68,7 @@ export default function TabBar() {
               isActive(t.href) ? "bg-goodbg text-sagedeep" : "text-inksoft hover:bg-cream2"
             }`}
           >
-            <span>{t.icon}</span> {t.label}
+            <Image src={t.icon} alt="" width={22} height={22} className="rounded-md" /> {t.label}
           </Link>
         ))}
         <Link
@@ -105,7 +106,7 @@ function TabLink({
         active ? "text-sagedeep bg-goodbg" : "text-inksoft"
       }`}
     >
-      <span className="text-xl leading-none">{icon}</span>
+      <Image src={icon} alt="" width={24} height={24} className="rounded-md" />
       {label}
     </Link>
   );
