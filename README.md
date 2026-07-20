@@ -10,6 +10,22 @@ debt for the next 5–10 years. Data lives in Postgres (Neon); each user only se
 
 ---
 
+## Screenshots
+
+*Amounts in the screenshots are randomized sample values.*
+
+### Mobile (default experience)
+
+| Home | Debts | Quick add |
+|---|---|---|
+| ![Home — savings, monthly checklist](docs/screenshots/mobile-home.png) | ![Debts — payoff curve and progress](docs/screenshots/mobile-debts.png) | ![Quick add transaction](docs/screenshots/mobile-add.png) |
+
+### Desktop
+
+![Desktop dashboard](docs/screenshots/desktop-home.png)
+
+![Future — 5/10-year projection](docs/screenshots/desktop-future.png)
+
 ## Stack
 
 - Next.js 16 (App Router, Turbopack) + TypeScript
