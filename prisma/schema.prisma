@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  accounts     FinAccount[]
+  debts        Debt[]
+  categories   Category[]
+  transactions Transaction[]
+  bills        RecurringBill[]
+  snapshots    MonthlySnapshot[]
+  settings     Settings?
+}
+
+enum AccountType {
+  BANK
+  SAVINGS
+  EWALLET
+  CASH
+}
+
+model FinAccount {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  type      AccountType
+  balance   BigInt      @default(0)
+  createdAt DateTime    @default(now())
+
+  transactions Transaction[]
+}
+
+enum DebtStatus {
+  ACTIVE
+  PAID_OFF
+}
+
+model Debt {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lender    String
+  color     String     @default("#E8A07C")
+  status    DebtStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+
+  schedule    DebtScheduleEntry[]
+  payments    DebtPayment[]
+  adjustments DebtAdjustment[]
+
+  @@unique([userId, lender])
+}
+
+// planned installment for a given month (month = first day of month, UTC)
+model DebtScheduleEntry {
+  id      String   @id @default(cuid())
+  debtId  String
+  debt    Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  month   DateTime @db.Date
+  planned BigInt
+
+  @@unique([debtId, month])
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  SKIPPED
+}
+
+model DebtPayment {
+  id       String        @id @default(cuid())
+  debtId   String
+  debt     Debt          @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  month    DateTime      @db.Date
+  amount   BigInt
+  paidDate DateTime      @default(now())
+  status   PaymentStatus @default(PAID)
+
+  @@unique([debtId, month])
+}
+
+// manual correction of remaining balance: positive = debt grew, negative = shrank
+model DebtAdjustment {
+  id        String   @id @default(cuid())
+  debtId    String
+  debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  month     DateTime @db.Date
+  delta     BigInt
+  reason    String   @default("")
+  createdAt DateTime @default(now())
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Category {
+  id     String       @id @default(cuid())
+  userId String
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  type   CategoryType
+  icon   String       @default("💸")
+
+  transactions Transaction[]
+  bills        RecurringBill[]
+
+  @@unique([userId, name, type])
+}
+
+enum Direction {
+  IN
+  OUT
+}
+
+model Transaction {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId  String
+  account    FinAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  date       DateTime   @default(now())
+  amount     BigInt
+  direction  Direction
+  note       String     @default("")
+
+  @@index([userId, date])
+}
+
+model RecurringBill {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  amount     BigInt
+  dueDay     Int
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  active     Boolean   @default(true)
+}
+
+model MonthlySnapshot {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month          DateTime @db.Date
+  totalSavings   BigInt
+  totalDebt      BigInt
+  incomeReceived BigInt
+
+  @@unique([userId, month])
+}
+
+model Settings {
+  userId        String @id
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyIncome BigInt @default(0)
+  livingRent    BigInt @default(0)
+  livingFood    BigInt @default(0)
+  livingFamily  BigInt @default(0)
+  livingOther   BigInt @default(0)
+  // long-term projection assumptions (percent per year)
+  salaryGrowthPct Float @default(5)
+  inflationPct    Float @default(3)
+  savingsRatePct  Float @default(2)
+}

@@ -1,0 +1,63 @@
+import { login } from "@/app/actions";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  return (
+    <main className="flex-1 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+        <h1 className="font-display text-4xl font-bold text-center">SmartSaku</h1>
+        <p className="text-inksoft text-center mt-2 mb-8 text-sm">
+          Your warm money manager. Sign in to continue.
+        </p>
+        <form
+          action={login}
+          className="bg-card border border-line rounded-lg p-6 shadow-soft space-y-4"
+        >
+          {error && (
+            <div className="bg-badbg text-bad rounded-md px-4 py-3 text-sm font-semibold">
+              Email or password is wrong. Please try again.
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-semibold text-inksoft mb-1.5" htmlFor="email">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              className="w-full rounded-md border border-line bg-cream2 px-4 py-3 text-sm focus:outline-none focus:border-sagedeep"
+              placeholder="you@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-inksoft mb-1.5" htmlFor="password">
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              className="w-full rounded-md border border-line bg-cream2 px-4 py-3 text-sm focus:outline-none focus:border-sagedeep"
+              placeholder="••••••••"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-full bg-sagedeep text-cream2 font-bold py-3.5 text-sm hover:opacity-90 transition"
+          >
+            Sign in
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
