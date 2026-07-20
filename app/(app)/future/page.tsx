@@ -34,7 +34,7 @@ export default async function FuturePage({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="font-display text-2xl font-semibold">Future</h1>
+        <h1 className="font-display text-2xl font-semibold">Forecast</h1>
         <div className="flex gap-1 bg-card border border-line rounded-full p-1">
           <Link
             href="/future?years=5"

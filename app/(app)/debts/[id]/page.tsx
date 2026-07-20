@@ -3,7 +3,13 @@ import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
-import { adjustDebt, payDebtMonth } from "@/app/actions";
+import {
+  adjustDebt,
+  deleteDebtAdjustment,
+  deleteDebtPayment,
+  payDebtMonth,
+  updateDebtPayment,
+} from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -90,15 +96,40 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                 <div className="font-semibold text-[13px]">{monthLabel(s.month)}</div>
                 {p && (
                   <div className="text-[11px] text-inksoft">
-                    paid {money.rp(Number(p.amount))} on {p.paidDate.toLocaleDateString("id-ID")}
+                    paid {money.rp(Number(p.amount))} on {p.paidDate.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
                   </div>
                 )}
               </div>
               <div className="font-extrabold money text-[13px]">{money.rpShort(Number(s.planned))}</div>
               {p ? (
-                <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">
-                  {p.status === "PAID" ? "Paid" : p.status.toLowerCase()}
-                </span>
+                <details className="relative">
+                  <summary className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5 cursor-pointer list-none">
+                    Paid ▾
+                  </summary>
+                  <div className="absolute right-0 z-30 mt-1.5 w-60 bg-card border border-line rounded-md p-3 shadow-soft space-y-2">
+                    <form action={updateDebtPayment} className="space-y-2">
+                      <input type="hidden" name="paymentId" value={p.id} />
+                      <label className="block text-[10.5px] font-bold text-inksoft">
+                        Paid amount
+                      </label>
+                      <MoneyInput
+                        name="amount"
+                        required
+                        defaultValue={Number(p.amount)}
+                        className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
+                      />
+                      <button className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2">
+                        Update payment
+                      </button>
+                    </form>
+                    <form action={deleteDebtPayment}>
+                      <input type="hidden" name="paymentId" value={p.id} />
+                      <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
+                        Remove payment
+                      </button>
+                    </form>
+                  </div>
+                </details>
               ) : isPast || isCurrent ? (
                 <form action={payDebtMonth}>
                   <input type="hidden" name="debtId" value={debt.id} />
@@ -133,14 +164,21 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
           <h2 className="text-sm font-bold mb-2">Adjustment history</h2>
           <div className="space-y-1.5">
             {debt.adjustments.map((a) => (
-              <div key={a.id} className="bg-card border border-line rounded-md px-3.5 py-2.5 flex justify-between text-[12.5px]">
-                <span className="text-inksoft">
-                  {a.createdAt.toLocaleDateString("id-ID")} {a.reason && `· ${a.reason}`}
+              <div key={a.id} className="bg-card border border-line rounded-md px-3.5 py-2.5 flex items-center gap-3 text-[12.5px]">
+                <span className="text-inksoft flex-1">
+                  {a.createdAt.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                  {a.reason && ` · ${a.reason}`}
                 </span>
                 <span className={`font-extrabold money ${Number(a.delta) < 0 ? "text-good" : "text-bad"}`}>
                   {Number(a.delta) > 0 ? "+" : ""}
                   {money.rpShort(Number(a.delta))}
                 </span>
+                <form action={deleteDebtAdjustment}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <button className="text-bad font-extrabold px-1" title="Remove adjustment">
+                    ✕
+                  </button>
+                </form>
               </div>
             ))}
           </div>

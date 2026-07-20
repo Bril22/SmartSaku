@@ -83,13 +83,14 @@ enum PaymentStatus {
 }
 
 model DebtPayment {
-  id       String        @id @default(cuid())
-  debtId   String
-  debt     Debt          @relation(fields: [debtId], references: [id], onDelete: Cascade)
-  month    DateTime      @db.Date
-  amount   BigInt
-  paidDate DateTime      @default(now())
-  status   PaymentStatus @default(PAID)
+  id            String        @id @default(cuid())
+  debtId        String
+  debt          Debt          @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  month         DateTime      @db.Date
+  amount        BigInt
+  paidDate      DateTime      @default(now())
+  status        PaymentStatus @default(PAID)
+  transactionId String?
 
   @@unique([debtId, month])
 }

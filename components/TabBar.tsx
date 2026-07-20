@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 const tabs = [
   { href: "/", label: "Home", icon: "/brand/icon-home.png" },
   { href: "/money", label: "Money", icon: "/brand/icon-money.png" },
-  { href: "/debts", label: "Debts", icon: "/brand/icon-debt-rate.png" },
-  { href: "/future", label: "Future", icon: "/brand/icon-future.png" },
+  { href: "/future", label: "Forecast", icon: "/brand/icon-forecast.png" },
+  { href: "/settings", label: "Settings", icon: "/brand/icon-goals.png" },
 ];
 
 function PlusIcon() {

@@ -119,6 +119,63 @@ export async function updateAccountBalance(formData: FormData) {
   redirect("/money?ok=" + encodeURIComponent("Balance updated"));
 }
 
+export async function updateTransaction(formData: FormData) {
+  const userId = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
+  const accountId = String(formData.get("accountId") ?? "");
+  const categoryId = String(formData.get("categoryId") ?? "") || null;
+  const note = String(formData.get("note") ?? "");
+  const dateRaw = String(formData.get("date") ?? "");
+  const backTo = String(formData.get("backTo") ?? "/money?tab=history");
+
+  const old = await prisma.transaction.findFirst({ where: { id, userId } });
+  const newAccount = await prisma.finAccount.findFirst({ where: { id: accountId, userId } });
+  if (!old || !newAccount || !amount) {
+    redirect(`${backTo}&err=` + encodeURIComponent("Could not update the transaction"));
+  }
+  const date = dateRaw ? new Date(dateRaw + "T08:00:00Z") : old!.date;
+  const oldEffect = old!.direction === "IN" ? old!.amount : -old!.amount;
+  const newEffect = BigInt(direction === "IN" ? amount : -amount);
+
+  await prisma.$transaction([
+    prisma.finAccount.update({
+      where: { id: old!.accountId },
+      data: { balance: { decrement: oldEffect } },
+    }),
+    prisma.finAccount.update({
+      where: { id: newAccount!.id },
+      data: { balance: { increment: newEffect } },
+    }),
+    prisma.transaction.update({
+      where: { id },
+      data: { amount: BigInt(amount), direction, accountId, categoryId, note, date },
+    }),
+  ]);
+  revalidatePath("/", "layout");
+  redirect(`${backTo}&ok=` + encodeURIComponent("Transaction updated"));
+}
+
+export async function deleteTransaction(formData: FormData) {
+  const userId = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const backTo = String(formData.get("backTo") ?? "/money?tab=history");
+  const old = await prisma.transaction.findFirst({ where: { id, userId } });
+  if (!old) redirect(`${backTo}&err=` + encodeURIComponent("Transaction not found"));
+  const effect = old!.direction === "IN" ? old!.amount : -old!.amount;
+  await prisma.$transaction([
+    prisma.finAccount.update({
+      where: { id: old!.accountId },
+      data: { balance: { decrement: effect } },
+    }),
+    prisma.debtPayment.updateMany({ where: { transactionId: id }, data: { transactionId: null } }),
+    prisma.transaction.delete({ where: { id } }),
+  ]);
+  revalidatePath("/", "layout");
+  redirect(`${backTo}&ok=` + encodeURIComponent("Transaction deleted — balance restored"));
+}
+
 /* ---------- debts ---------- */
 
 export async function payDebtMonth(formData: FormData) {
@@ -133,34 +190,33 @@ export async function payDebtMonth(formData: FormData) {
   if (!debt || !monthIso || amount <= 0) redirect(backTo);
   const month = new Date(monthIso);
 
-  const ops = [
-    prisma.debtPayment.upsert({
-      where: { debtId_month: { debtId, month } },
-      create: { debtId, month, amount: BigInt(amount), status: "PAID" },
-      update: { amount: BigInt(amount), status: "PAID", paidDate: new Date() },
-    }),
-  ];
-  if (accountId) {
-    const account = await prisma.finAccount.findFirst({ where: { id: accountId, userId } });
+  const account = accountId
+    ? await prisma.finAccount.findFirst({ where: { id: accountId, userId } })
+    : null;
+  await prisma.$transaction(async (tx) => {
+    let transactionId: string | null = null;
     if (account) {
-      ops.push(
-        prisma.transaction.create({
-          data: {
-            userId,
-            accountId,
-            amount: BigInt(amount),
-            direction: "OUT",
-            note: `Debt payment — ${debt.lender}`,
-          },
-        }) as never,
-        prisma.finAccount.update({
-          where: { id: accountId },
-          data: { balance: { decrement: BigInt(amount) } },
-        }) as never,
-      );
+      const created = await tx.transaction.create({
+        data: {
+          userId,
+          accountId: account.id,
+          amount: BigInt(amount),
+          direction: "OUT",
+          note: `Debt payment — ${debt.lender}`,
+        },
+      });
+      transactionId = created.id;
+      await tx.finAccount.update({
+        where: { id: account.id },
+        data: { balance: { decrement: BigInt(amount) } },
+      });
     }
-  }
-  await prisma.$transaction(ops);
+    await tx.debtPayment.upsert({
+      where: { debtId_month: { debtId, month } },
+      create: { debtId, month, amount: BigInt(amount), status: "PAID", transactionId },
+      update: { amount: BigInt(amount), status: "PAID", paidDate: new Date(), transactionId },
+    });
+  });
 
   // detect full payoff for the big celebration
   const [schedule, payments, adjustments] = await Promise.all([
@@ -198,6 +254,78 @@ export async function adjustDebt(formData: FormData) {
   revalidatePath("/debts");
   revalidatePath(`/debts/${debtId}`);
   redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Adjustment applied ⚖️"));
+}
+
+export async function updateDebtPayment(formData: FormData) {
+  const userId = await requireUser();
+  const paymentId = String(formData.get("paymentId") ?? "");
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const payment = await prisma.debtPayment.findFirst({
+    where: { id: paymentId, debt: { userId } },
+    include: { debt: true },
+  });
+  if (!payment || !amount) redirect("/money?tab=debts");
+  const backTo = `/debts/${payment!.debtId}`;
+  const diff = BigInt(amount) - payment!.amount;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.debtPayment.update({ where: { id: paymentId }, data: { amount: BigInt(amount) } });
+    if (payment!.transactionId) {
+      const linked = await tx.transaction.findUnique({ where: { id: payment!.transactionId } });
+      if (linked) {
+        await tx.transaction.update({
+          where: { id: linked.id },
+          data: { amount: BigInt(amount) },
+        });
+        await tx.finAccount.update({
+          where: { id: linked.accountId },
+          data: { balance: { decrement: diff } },
+        });
+      }
+    }
+  });
+  revalidatePath("/", "layout");
+  redirect(`${backTo}?ok=` + encodeURIComponent("Payment updated — balances synced"));
+}
+
+export async function deleteDebtPayment(formData: FormData) {
+  const userId = await requireUser();
+  const paymentId = String(formData.get("paymentId") ?? "");
+  const payment = await prisma.debtPayment.findFirst({
+    where: { id: paymentId, debt: { userId } },
+  });
+  if (!payment) redirect("/money?tab=debts");
+  const backTo = `/debts/${payment!.debtId}`;
+
+  await prisma.$transaction(async (tx) => {
+    if (payment!.transactionId) {
+      const linked = await tx.transaction.findUnique({ where: { id: payment!.transactionId } });
+      if (linked) {
+        await tx.finAccount.update({
+          where: { id: linked.accountId },
+          data: { balance: { increment: linked.amount } },
+        });
+        await tx.transaction.delete({ where: { id: linked.id } });
+      }
+    }
+    await tx.debtPayment.delete({ where: { id: paymentId } });
+    await tx.debt.updateMany({
+      where: { id: payment!.debtId, status: "PAID_OFF" },
+      data: { status: "ACTIVE" },
+    });
+  });
+  revalidatePath("/", "layout");
+  redirect(`${backTo}?ok=` + encodeURIComponent("Payment removed — money returned to account"));
+}
+
+export async function deleteDebtAdjustment(formData: FormData) {
+  const userId = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const adj = await prisma.debtAdjustment.findFirst({ where: { id, debt: { userId } } });
+  if (!adj) redirect("/money?tab=debts");
+  await prisma.debtAdjustment.delete({ where: { id } });
+  revalidatePath("/", "layout");
+  redirect(`/debts/${adj!.debtId}?ok=` + encodeURIComponent("Adjustment removed"));
 }
 
 /* ---------- settings ---------- */

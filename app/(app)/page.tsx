@@ -6,6 +6,7 @@ import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import { payDebtMonth } from "@/app/actions";
+import CategoryPie from "@/components/CategoryPie";
 
 export default async function HomePage() {
   const userId = await requireUserId();
@@ -21,6 +22,7 @@ export default async function HomePage() {
     getDebtSummaries(userId),
     prisma.transaction.findMany({
       where: { userId, date: { gte: now, lt: nextMonth } },
+      include: { category: true },
     }),
     prisma.recurringBill.findMany({ where: { userId, active: true } }),
     getMoney(userId),
@@ -41,6 +43,16 @@ export default async function HomePage() {
     null,
   );
   const defaultAccount = accounts[0];
+
+  const spendGroups = new Map<string, { name: string; icon: string; value: number }>();
+  for (const t of monthTx) {
+    if (t.direction !== "OUT") continue;
+    const name = t.category?.name ?? "No category";
+    const g = spendGroups.get(name) ?? { name, icon: t.category?.icon ?? "🏷️", value: 0 };
+    g.value += Number(t.amount);
+    spendGroups.set(name, g);
+  }
+  const spendPie = [...spendGroups.values()].sort((a, b) => b.value - a.value);
 
   return (
     <div>
@@ -103,6 +115,23 @@ export default async function HomePage() {
         </div>
       </div>
 
+      {/* spending breakdown */}
+      <div className="bg-card border border-line rounded-lg p-4 mb-5">
+        <div className="flex items-baseline justify-between mb-2">
+          <h2 className="text-sm font-bold">Spending by category ({monthLabel(now)})</h2>
+          <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
+            History
+          </Link>
+        </div>
+        <CategoryPie
+          data={spendPie}
+          code={money.code}
+          ratePerIdr={money.ratePerIdr}
+          symbol={money.symbol}
+          emptyText="No expenses yet this month. 🌱"
+        />
+      </div>
+
       {/* accounts strip */}
       <div className="flex items-baseline justify-between mb-2">
         <h2 className="text-sm font-bold">Accounts</h2>
@@ -126,7 +155,7 @@ export default async function HomePage() {
         <h2 className="text-sm font-bold">
           To pay this month{unpaid.length > 0 && ` · ${unpaid.length} left`}
         </h2>
-        <Link href="/debts" className="text-xs font-bold text-sagedeep">
+        <Link href="/money?tab=debts" className="text-xs font-bold text-sagedeep">
           See all
         </Link>
       </div>
