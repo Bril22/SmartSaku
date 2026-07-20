@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const CONFETTI_COLORS = ["#31694E", "#BBC863", "#F0E491", "#E8A07C", "#C96F4A"];
@@ -13,12 +13,14 @@ export default function Toaster() {
   const [fx, setFx] = useState<string | null>(null);
 
   const [isError, setIsError] = useState(false);
+  const showId = useRef(0);
 
   useEffect(() => {
     const ok = searchParams.get("ok");
     const err = searchParams.get("err");
     const fxParam = searchParams.get("fx");
     if (!ok && !err && !fxParam) return;
+    const id = ++showId.current;
     setToast(err ?? ok);
     setIsError(!!err);
     setFx(fxParam);
@@ -30,12 +32,14 @@ export default function Toaster() {
     rest.delete("fx");
     router.replace(rest.size ? `${pathname}?${rest}` : pathname, { scroll: false });
 
-    const t1 = setTimeout(() => setToast(null), 3000);
-    const t2 = setTimeout(() => setFx(null), 3000);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
+    // no cleanup on searchParams change (the replace above would cancel it);
+    // showId guards against an old timer hiding a newer toast
+    setTimeout(() => {
+      if (showId.current === id) {
+        setToast(null);
+        setFx(null);
+      }
+    }, 3000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 

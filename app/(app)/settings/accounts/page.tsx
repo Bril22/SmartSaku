@@ -2,7 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { getMoney } from "@/lib/money";
+import { addAccount } from "@/app/actions";
 import { deleteFinAccount, renameFinAccount, toggleArchiveAccount } from "@/app/settings/actions";
+import MoneyInput from "@/components/MoneyInput";
+import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
@@ -75,6 +78,45 @@ export default async function ManageAccountsPage() {
           );
         })}
       </div>
+      <h2 className="text-sm font-bold mt-6 mb-2">Add account</h2>
+      <form action={addAccount} className="bg-card border border-line rounded-lg p-4 space-y-2.5">
+        <input type="hidden" name="backTo" value="/settings/accounts" />
+        <input
+          name="name"
+          required
+          placeholder="Account name (e.g. BCA)"
+          maxLength={40}
+          className="w-full rounded-md border border-line bg-cream2 px-3.5 py-2.5 text-sm"
+        />
+        <div className="flex gap-2.5">
+          <div className="flex-1">
+            <Select
+              name="type"
+              defaultValue="BANK"
+              options={[
+                { value: "BANK", label: "Bank", icon: "🏦" },
+                { value: "SAVINGS", label: "Savings", icon: "🌱" },
+                { value: "EWALLET", label: "E-wallet", icon: "📱" },
+                { value: "CASH", label: "Cash", icon: "💵" },
+              ]}
+            />
+          </div>
+          <div className="flex-1">
+            <MoneyInput
+              name="balance"
+              placeholder="Starting balance"
+              className="w-full rounded-md border border-line bg-cream2 px-3.5 py-3 text-sm text-right money"
+            />
+          </div>
+        </div>
+        <SubmitButton
+          className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+          pendingText="Creating…"
+        >
+          Create account
+        </SubmitButton>
+      </form>
+
       <p className="text-[11.5px] text-inksoft mt-4">
         Accounts with transactions can be archived (hidden everywhere) but not deleted, so your
         history stays correct.

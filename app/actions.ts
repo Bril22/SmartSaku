@@ -102,10 +102,11 @@ export async function addAccount(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const type = String(formData.get("type") ?? "BANK") as "BANK" | "SAVINGS" | "EWALLET" | "CASH";
   const balance = Math.round(Number(formData.get("balance") ?? 0));
-  if (!name) redirect("/money");
+  const backTo = String(formData.get("backTo") ?? "/money");
+  if (!name) redirect(backTo);
   await prisma.finAccount.create({ data: { userId, name, type, balance: BigInt(balance) } });
-  revalidatePath("/money");
-  redirect("/money?ok=" + encodeURIComponent(`Account "${name}" created`));
+  revalidatePath("/", "layout");
+  redirect(`${backTo}?ok=` + encodeURIComponent(`Account "${name}" created`));
 }
 
 export async function updateAccountBalance(formData: FormData) {
