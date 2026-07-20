@@ -49,7 +49,7 @@ export function FutureChart({
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#6F6350" }} interval="preserveStartEnd" minTickGap={50} />
           <YAxis tick={{ fontSize: 10, fill: "#6F6350" }} tickFormatter={fmtShort} width={46} />
           <Tooltip formatter={(v) => fmtFull(Number(v))} contentStyle={{ borderRadius: 12, border: "1px solid #EBDCC3", fontSize: 12 }} />
-          <Area type="monotone" dataKey="savings" name="Savings" stroke="#6E7A4C" strokeWidth={2.5} fill="rgba(165,175,121,.25)" />
+          <Area type="monotone" dataKey="savings" name="Savings" stroke="#31694E" strokeWidth={2.5} fill="rgba(187,200,99,.3)" />
           <Area type="monotone" dataKey="debt" name="Debt remaining" stroke="#C96F4A" strokeWidth={2} fill="rgba(232,160,124,.2)" />
         </AreaChart>
       </ResponsiveContainer>

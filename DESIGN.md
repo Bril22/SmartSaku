@@ -31,7 +31,18 @@ SmartSaku is a personal money manager and debt payoff app. The design is warm an
 - **Scale:** 12 / 13.5 / 15 (body) / 18 / 24 / 30 / 38px (hero money).
 
 ## Color
-- **Approach:** balanced — sage = growth/savings/success, peach = debt/action, cream = surface.
+- **Approach:** balanced — green scale = growth/savings/success (DEFAULT since 2026-07-20), peach = debt/action, cream = surface.
+
+**Default green scale (primary):**
+
+| Token | Hex | Usage |
+|---|---|---|
+| sun | #F0E491 | highlight chips, hero accents (sparingly) |
+| lime | #BBC863 | chart fills, progress bars, decorative |
+| leaf | #658C58 | sage token — progress, savings fills, hero gradient end |
+| forest | #31694E | sagedeep token — primary buttons, links, success text, hero gradient start |
+
+**Neutrals & support:**
 
 | Token | Hex | Usage |
 |---|---|---|
@@ -39,18 +50,17 @@ SmartSaku is a personal money manager and debt payoff app. The design is warm an
 | cream-2 | #FFF7EA | raised background, phone frame |
 | card | #FFFFFF | cards/surfaces |
 | line | #EBDCC3 | borders, dividers |
-| sage | #A5AF79 | progress bars, savings fills, decorative |
-| sage-deep | #6E7A4C | primary buttons, links, success text (AA on cream/white) |
 | earth | #827148 | secondary text, ghost buttons, icons |
 | ink | #443A28 | body text (AA on cream) |
 | ink-soft | #6F6350 | muted text |
 | peach | #E8A07C | debt fills, highlights |
-| peach-deep | #C96F4A | accent CTA, debt emphasis |
-| semantic good | #6E7A4C | success |
+| peach-deep | #C96F4A | accent CTA (FAB), debt emphasis |
+| semantic good | #31694E | success ("Lunas!") |
+| good-bg | #E9EFD8 | success tint backgrounds |
 | semantic warn | #C79A3D | warnings (derived amber, harmonized) |
 | semantic bad | #C0563E | errors/overdue |
 
-- **Contrast rule:** never put #A5AF79 or #E8A07C text on cream — use the deep variants for text.
+- **Contrast rule:** never put #BBC863, #F0E491, or #E8A07C text on cream — use #31694E / #C96F4A for text.
 - **Dark mode:** not in v1. Later: warm dark brown surfaces (#2A241A), desaturate fills 15%.
 
 ## Spacing
@@ -81,3 +91,5 @@ SmartSaku is a personal money manager and debt payoff app. The design is warm an
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-07-20 | Initial design system | /design-consultation; palette provided by owner; research on YNAB/Copilot/Monefy/Debt Payoff Planner |
+| 2026-07-20 | Green scale #F0E491/#BBC863/#658C58/#31694E is the default primary palette | Owner request; deeper greens also improve text contrast |
+| 2026-07-20 | Desktop = full width with sidebar; two-column Home/Money, 2–3 col Debts grid | Owner feedback: desktop looked like a stretched phone |

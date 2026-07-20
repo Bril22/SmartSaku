@@ -45,7 +45,7 @@ export default async function DebtsPage() {
         )}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
         {debts.map((d) => {
           const done = d.remaining <= 0;
           return (
@@ -69,7 +69,7 @@ export default async function DebtsPage() {
               <div className="h-2 rounded-full bg-cream overflow-hidden">
                 <div
                   className="h-full rounded-full"
-                  style={{ width: `${d.progressPct}%`, background: done ? "#6E7A4C" : d.color }}
+                  style={{ width: `${d.progressPct}%`, background: done ? "#31694E" : d.color }}
                 />
               </div>
             </Link>

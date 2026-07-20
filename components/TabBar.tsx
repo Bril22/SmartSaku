@@ -19,19 +19,20 @@ export default function TabBar() {
     <>
       {/* mobile bottom bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-line pb-[env(safe-area-inset-bottom)]">
-        <div className="relative flex justify-around items-end px-1 pt-2 pb-2.5">
-          <Link
-            href="/add"
-            aria-label="Quick add"
-            className="absolute left-1/2 -translate-x-1/2 -top-6 w-13 h-13 rounded-full bg-peachdeep text-white flex items-center justify-center text-2xl font-bold shadow-[0_6px_16px_rgba(201,111,74,.4)]"
-            style={{ width: 52, height: 52 }}
-          >
-            +
-          </Link>
+        <div className="grid grid-cols-5 place-items-center pt-2 pb-2.5">
           {tabs.slice(0, 2).map((t) => (
             <TabLink key={t.href} {...t} active={isActive(t.href)} />
           ))}
-          <div className="w-13" style={{ width: 52 }} />
+          <div className="relative w-full h-full">
+            <Link
+              href="/add"
+              aria-label="Quick add"
+              className="absolute left-1/2 -translate-x-1/2 -top-8 rounded-full bg-peachdeep text-white flex items-center justify-center text-2xl font-bold shadow-[0_6px_16px_rgba(201,111,74,.4)]"
+              style={{ width: 52, height: 52 }}
+            >
+              +
+            </Link>
+          </div>
           {tabs.slice(2).map((t) => (
             <TabLink key={t.href} {...t} active={isActive(t.href)} />
           ))}

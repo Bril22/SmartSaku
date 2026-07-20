@@ -67,14 +67,15 @@ export default async function FuturePage({
         </div>
       )}
 
-      <div className="bg-card border border-line rounded-lg p-4 mb-5 shadow-soft">
+      <div className="md:grid md:grid-cols-[3fr_2fr] md:gap-6 md:items-start">
+      <div className="bg-card border border-line rounded-lg p-4 mb-5 md:mb-0 shadow-soft">
         <div className="text-[11px] uppercase tracking-wide text-inksoft mb-2">
           Savings vs debt — next {years} years
         </div>
         <FutureChart data={points} />
       </div>
 
-      <details className="bg-card border border-line rounded-lg p-4">
+      <details className="bg-card border border-line rounded-lg p-4" open>
         <summary className="text-sm font-bold cursor-pointer">Assumptions (income, living, growth)</summary>
         <form action={updateSettings} className="mt-3 space-y-3">
           <Field label="Monthly income (Rp)" name="monthlyIncome" value={Number(settings?.monthlyIncome ?? 0)} />
@@ -94,6 +95,7 @@ export default async function FuturePage({
           </button>
         </form>
       </details>
+      </div>
     </div>
   );
 }

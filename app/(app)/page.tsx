@@ -50,8 +50,10 @@ export default async function HomePage() {
         </form>
       </div>
 
+      <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
+      <div>
       {/* hero */}
-      <div className="rounded-lg p-5 text-cream2 mb-4" style={{ background: "linear-gradient(135deg,#6E7A4C,#87935D)" }}>
+      <div className="rounded-lg p-5 text-cream2 mb-4" style={{ background: "linear-gradient(135deg,#31694E,#658C58)" }}>
         <div className="text-[11px] uppercase tracking-wider opacity-85">Total savings</div>
         <div className="font-display text-3xl font-bold money mt-0.5 mb-3">{rp(totalSavings)}</div>
         <div className="flex gap-5 text-xs">
@@ -82,6 +84,24 @@ export default async function HomePage() {
         </div>
       </div>
 
+      {/* accounts strip */}
+      <div className="flex items-baseline justify-between mb-2">
+        <h2 className="text-sm font-bold">Accounts</h2>
+        <Link href="/money" className="text-xs font-bold text-sagedeep">
+          Manage
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-3 mb-6 md:mb-0">
+        {accounts.map((a) => (
+          <div key={a.id} className="bg-card border border-line rounded-md p-3.5">
+            <div className="text-[10.5px] uppercase tracking-wide text-inksoft">{a.name}</div>
+            <div className="font-extrabold money mt-1 text-[15px]">{rp(Number(a.balance))}</div>
+          </div>
+        ))}
+      </div>
+      </div>
+
+      <div>
       {/* checklist */}
       <div className="flex items-baseline justify-between mb-2">
         <h2 className="text-sm font-bold">
@@ -102,7 +122,7 @@ export default async function HomePage() {
           <div key={d.id} className="bg-card border border-line rounded-md p-3 flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-[11px] flex items-center justify-center text-base shrink-0"
-              style={{ background: d.thisMonthStatus === "PAID" ? "#EDF0DF" : "#FBE8DC" }}
+              style={{ background: d.thisMonthStatus === "PAID" ? "#E9EFD8" : "#FBE8DC" }}
             >
               🏦
             </div>
@@ -142,20 +162,7 @@ export default async function HomePage() {
         ))}
       </div>
 
-      {/* accounts strip */}
-      <div className="flex items-baseline justify-between mb-2">
-        <h2 className="text-sm font-bold">Accounts</h2>
-        <Link href="/money" className="text-xs font-bold text-sagedeep">
-          Manage
-        </Link>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {accounts.map((a) => (
-          <div key={a.id} className="bg-card border border-line rounded-md p-3.5">
-            <div className="text-[10.5px] uppercase tracking-wide text-inksoft">{a.name}</div>
-            <div className="font-extrabold money mt-1 text-[15px]">{rp(Number(a.balance))}</div>
-          </div>
-        ))}
       </div>
     </div>
   );

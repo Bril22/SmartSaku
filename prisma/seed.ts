@@ -21,8 +21,8 @@ const COLORS: Record<string, string> = {
   SPinjam: "#C96F4A",
   SPayLater: "#E8A07C",
   SMBC: "#827148",
-  Tunaiku: "#A5AF79",
-  GoPay: "#6E7A4C",
+  Tunaiku: "#BBC863",
+  GoPay: "#31694E",
   Traveloka: "#B98A5E",
   "Home Credit": "#D9B08C",
 };

@@ -28,6 +28,8 @@ export default async function MoneyPage() {
         </Link>
       </div>
 
+      <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
+      <div>
       <div className="bg-card border border-line rounded-lg p-4 mb-5 shadow-soft">
         <div className="text-[11px] uppercase tracking-wide text-inksoft">All accounts</div>
         <div className="font-display text-2xl font-bold money mt-0.5">{rp(total)}</div>
@@ -87,7 +89,9 @@ export default async function MoneyPage() {
           <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-4 py-2">Create</button>
         </form>
       </details>
+      </div>
 
+      <div>
       <h2 className="text-sm font-bold mb-2">Recent transactions</h2>
       <div className="space-y-1.5">
         {txs.length === 0 && (
@@ -115,6 +119,8 @@ export default async function MoneyPage() {
             </div>
           </div>
         ))}
+      </div>
+      </div>
       </div>
     </div>
   );

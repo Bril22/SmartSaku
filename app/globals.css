@@ -5,15 +5,21 @@
   --color-cream2: #fff7ea;
   --color-card: #ffffff;
   --color-line: #ebdcc3;
-  --color-sage: #a5af79;
-  --color-sagedeep: #6e7a4c;
+  /* default green scale */
+  --color-sun: #f0e491;
+  --color-lime: #bbc863;
+  --color-leaf: #658c58;
+  --color-forest: #31694e;
+
+  --color-sage: #658c58;
+  --color-sagedeep: #31694e;
   --color-earth: #827148;
   --color-ink: #443a28;
   --color-inksoft: #6f6350;
   --color-peach: #e8a07c;
   --color-peachdeep: #c96f4a;
-  --color-good: #6e7a4c;
-  --color-goodbg: #edf0df;
+  --color-good: #31694e;
+  --color-goodbg: #e9efd8;
   --color-warn: #8a6a24;
   --color-warnbg: #f7ecd4;
   --color-bad: #c0563e;
