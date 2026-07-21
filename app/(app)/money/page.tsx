@@ -31,6 +31,7 @@ type Search = {
   from?: string;
   to?: string;
   kind?: string;
+  q?: string;
 };
 
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -418,6 +419,23 @@ async function HistoryTab({
     rangeLabel = `${sp.from} → ${sp.to}`;
   }
 
+  const query = (sp.q ?? "").trim();
+  const searchResults = query
+    ? await prisma.transaction.findMany({
+        where: {
+          userId,
+          OR: [
+            { note: { contains: query, mode: "insensitive" } },
+            { category: { name: { contains: query, mode: "insensitive" } } },
+            { account: { name: { contains: query, mode: "insensitive" } } },
+          ],
+        },
+        include: { category: true, account: true },
+        orderBy: { date: "desc" },
+        take: 100,
+      })
+    : [];
+
   const [monthTxs, rangeTxs] = await Promise.all([
     prisma.transaction.findMany({
       where: { userId, date: { gte: monthStart, lt: monthEnd } },
@@ -456,14 +474,72 @@ async function HistoryTab({
 
   return (
     <div>
-    <div className="flex justify-end mb-3 -mt-2">
+    <div className="flex items-center gap-2 mb-3 -mt-2">
+      <form method="GET" action="/money" className="flex-1 flex gap-2">
+        <input type="hidden" name="tab" value="history" />
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Search notes, categories, accounts…"
+          className="flex-1 min-w-0 rounded-full border border-line bg-card px-4 py-2 text-xs"
+        />
+        <button className="rounded-full bg-sagedeep text-cream2 px-4 py-2 text-xs font-extrabold shrink-0">
+          Search
+        </button>
+      </form>
       <Link
         href="/import"
-        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-4 py-2 text-xs font-extrabold text-sagedeep"
+        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-2 text-xs font-extrabold text-sagedeep shrink-0"
+        title="Import from file with AI"
       >
-        📄 Import from file (AI)
+        📄 AI
       </Link>
     </div>
+
+    {query && (
+      <div className="bg-card border border-line rounded-lg p-4 mb-4">
+        <div className="flex items-baseline justify-between mb-2">
+          <h2 className="text-sm font-bold">
+            {searchResults.length} result{searchResults.length === 1 ? "" : "s"} for “{query}”
+          </h2>
+          <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
+            Clear
+          </Link>
+        </div>
+        <div className="space-y-1.5">
+          {searchResults.length === 0 && (
+            <p className="text-[12.5px] text-inksoft">Nothing matched. Try another word.</p>
+          )}
+          {searchResults.map((t) => (
+            <Link
+              key={t.id}
+              href={`/money/tx/${t.id}`}
+              className="bg-cream2 rounded-md px-3.5 py-2.5 flex items-center gap-3 hover:border-sagedeep border border-transparent"
+            >
+              <span className="text-base">
+                {t.category?.icon ?? (t.direction === "IN" ? "💰" : "💸")}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[13px] truncate">
+                  {t.category?.name || t.note || "Transaction"}
+                </div>
+                <div className="text-[11px] text-inksoft truncate">
+                  {t.account.name} ·{" "}
+                  {t.date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                  {t.note && t.category ? ` · ${t.note}` : ""}
+                </div>
+              </div>
+              <span
+                className={`font-extrabold money text-[13px] whitespace-nowrap ${t.direction === "IN" ? "text-sagedeep" : "text-peachdeep"}`}
+              >
+                {t.direction === "IN" ? "+" : "−"}
+                {money.rpShort(Number(t.amount))}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    )}
     <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
       <div className="bg-card border border-line rounded-lg p-4 mb-5 md:mb-0">
         <div className="flex items-center justify-between mb-2">
