@@ -25,12 +25,57 @@ model User {
   settings     Settings?
   imports      ImportBatch[]
   goals        Goal[]
+  memberships  SpaceMember[]
+}
+
+model Space {
+  id        String   @id @default(cuid())
+  name      String
+  personal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  members      SpaceMember[]
+  invites      SpaceInvite[]
+  accounts     FinAccount[]
+  debts        Debt[]
+  categories   Category[]
+  transactions Transaction[]
+  planned      PlannedTransaction[]
+  goals        Goal[]
+  imports      ImportBatch[]
+}
+
+model SpaceMember {
+  id       String   @id @default(cuid())
+  spaceId  String
+  space    Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+
+  @@unique([spaceId, userId])
+}
+
+model SpaceInvite {
+  id        String   @id @default(cuid())
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  email     String
+  invitedBy String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@unique([spaceId, email])
+  @@index([email])
 }
 
 model ImportBatch {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId   String?
+  space     Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   fileName  String
   status    String   @default("DRAFT")
   rows      Json
@@ -54,6 +99,8 @@ model FinAccount {
   archived  Boolean     @default(false)
   createdAt DateTime    @default(now())
 
+  spaceId      String?
+  space        Space?               @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   transactions Transaction[]
   planned      PlannedTransaction[]
 }
@@ -72,11 +119,13 @@ model Debt {
   status    DebtStatus @default(ACTIVE)
   createdAt DateTime   @default(now())
 
+  spaceId     String?
+  space       Space?              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   schedule    DebtScheduleEntry[]
   payments    DebtPayment[]
   adjustments DebtAdjustment[]
 
-  @@unique([userId, lender])
+  @@unique([spaceId, lender])
 }
 
 // planned installment for a given month (month = first day of month, UTC)
@@ -134,11 +183,13 @@ model Category {
   icon   String       @default("💸")
   budget BigInt       @default(0)
 
+  spaceId      String?
+  space        Space?               @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   transactions Transaction[]
   bills        RecurringBill[]
   planned      PlannedTransaction[]
 
-  @@unique([userId, name, type])
+  @@unique([spaceId, name, type])
 }
 
 enum Direction {
@@ -158,6 +209,8 @@ model Transaction {
   amount        BigInt
   direction     Direction
   note          String     @default("")
+  spaceId       String?
+  space         Space?     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   plannedId     String?
   plannedMonth  DateTime?  @db.Date
   importBatchId String?
@@ -186,6 +239,8 @@ model PlannedTransaction {
   name       String
   amount     BigInt
   direction  Direction
+  spaceId    String?
+  space      Space?      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   dayOfMonth Int         @default(1)
   accountId  String?
   account    FinAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
@@ -201,6 +256,8 @@ model Goal {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String
   icon         String    @default("🎯")
+  spaceId      String?
+  space        Space?    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   targetAmount BigInt
   targetDate   DateTime? @db.Date
   note         String    @default("")

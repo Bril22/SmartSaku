@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import {
@@ -19,10 +19,10 @@ import PayForm from "@/components/PayForm";
 import Popover from "@/components/Popover";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const { id } = await params;
   const debt = await prisma.debt.findFirst({
-    where: { id, userId },
+    where: { id, spaceId },
     include: {
       schedule: { orderBy: { month: "asc" } },
       payments: { orderBy: { month: "asc" } },
@@ -34,7 +34,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
   const now = monthKey();
   const [accounts, money] = await Promise.all([
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
     getMoney(userId),

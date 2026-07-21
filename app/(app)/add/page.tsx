@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { addTransaction } from "@/app/actions";
 import TransactionForm, { type CategoryOption } from "@/components/TransactionForm";
 
@@ -9,14 +9,14 @@ export default async function AddPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const { error } = await searchParams;
   const [accounts, categories] = await Promise.all([
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
-    prisma.category.findMany({ where: { userId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
+    prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
   ]);
 
   const categoryOptions: CategoryOption[] = categories.map((c) => ({

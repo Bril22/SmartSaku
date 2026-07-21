@@ -15,7 +15,7 @@ export default function Popover({
 }) {
   const [open, setOpen] = useState(false);
   const [flipUp, setFlipUp] = useState(false);
-  const [alignLeft, setAlignLeft] = useState(false);
+  const [offset, setOffset] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -45,13 +45,21 @@ export default function Popover({
   }, [open]);
 
   useLayoutEffect(() => {
-    if (!open || !panelRef.current || !ref.current) return;
-    const panel = panelRef.current.getBoundingClientRect();
-    const anchor = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - anchor.bottom;
-    const spaceAbove = anchor.top;
-    setFlipUp(spaceBelow < panel.height + 16 && spaceAbove > spaceBelow);
-    setAlignLeft(anchor.right - panel.width < 8 && anchor.left + panel.width < window.innerWidth - 8);
+    if (!open) return;
+    const place = () => {
+      if (!panelRef.current || !ref.current) return;
+      const panel = panelRef.current.getBoundingClientRect();
+      const anchor = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - anchor.bottom;
+      const spaceAbove = anchor.top;
+      setFlipUp(spaceBelow < panel.height + 16 && spaceAbove > spaceBelow);
+      const maxLeft = Math.max(8, window.innerWidth - panel.width - 8);
+      const wanted = Math.min(Math.max(anchor.right - panel.width, 8), maxLeft);
+      setOffset(wanted - anchor.left);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
   }, [open]);
 
   return (
@@ -62,9 +70,10 @@ export default function Popover({
       {open && (
         <div
           ref={panelRef}
-          className={`absolute z-30 ${width} max-h-[min(70vh,420px)] overflow-y-auto overscroll-contain bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2 ${
+          className={`absolute z-30 ${width} max-w-[calc(100vw-16px)] max-h-[min(70vh,420px)] overflow-y-auto overscroll-contain bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2 ${
             flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } ${alignLeft ? "left-0" : "right-0"}`}
+          } ${offset === null ? "right-0" : ""}`}
+          style={offset === null ? undefined : { left: offset }}
         >
           {children}
         </div>

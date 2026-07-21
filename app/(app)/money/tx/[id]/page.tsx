@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { deleteTransaction, updateTransaction } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
@@ -12,15 +12,15 @@ export default async function EditTransactionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const { id } = await params;
   const [tx, accounts, categories] = await Promise.all([
-    prisma.transaction.findFirst({ where: { id, userId }, include: { category: true } }),
+    prisma.transaction.findFirst({ where: { id, spaceId }, include: { category: true } }),
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
-    prisma.category.findMany({ where: { userId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
+    prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
   ]);
   if (!tx) notFound();
 

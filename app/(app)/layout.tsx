@@ -1,18 +1,13 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { getSessionUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import TabBar from "@/components/TabBar";
 import Toaster from "@/components/Toaster";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  const exists = await prisma.user.count({ where: { id: userId } });
-  if (exists === 0) redirect("/login");
+  const { spaceName, personal, shared } = await requireSpace();
   return (
     <div className="flex-1">
-      <TabBar />
+      <TabBar spaceName={personal ? null : spaceName} shared={shared} />
       <Suspense fallback={null}>
         <Toaster />
       </Suspense>

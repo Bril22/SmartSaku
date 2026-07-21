@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import type { ImportRow } from "@/lib/importer";
 import ImportPreview from "@/components/ImportPreview";
 
@@ -10,17 +10,17 @@ export default async function ImportPreviewPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const { id } = await params;
-  const batch = await prisma.importBatch.findFirst({ where: { id, userId } });
+  const batch = await prisma.importBatch.findFirst({ where: { id, spaceId } });
   if (!batch) notFound();
   if (batch.status === "DONE") {
     redirect("/money?tab=history&ok=" + encodeURIComponent("This file was already imported"));
   }
 
   const [accounts, categories] = await Promise.all([
-    prisma.finAccount.findMany({ where: { userId, archived: false }, orderBy: { name: "asc" } }),
-    prisma.category.findMany({ where: { userId }, orderBy: { name: "asc" } }),
+    prisma.finAccount.findMany({ where: { spaceId, archived: false }, orderBy: { name: "asc" } }),
+    prisma.category.findMany({ where: { spaceId }, orderBy: { name: "asc" } }),
   ]);
 
   const rows = batch.rows as ImportRow[];

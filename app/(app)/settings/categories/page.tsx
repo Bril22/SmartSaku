@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { addCategory, deleteCategory, updateCategory } from "@/app/settings/actions";
 import MoneyInput from "@/components/MoneyInput";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function ManageCategoriesPage() {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const categories = await prisma.category.findMany({
-    where: { userId },
+    where: { spaceId },
     orderBy: [{ type: "asc" }, { name: "asc" }],
   });
   const expense = categories.filter((c) => c.type === "EXPENSE");

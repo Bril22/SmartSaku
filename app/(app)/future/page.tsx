@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { getDebtSummaries, projectFuture } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
@@ -24,7 +24,7 @@ export default async function FuturePage({
 }: {
   searchParams: Promise<{ years?: string; on?: string }>;
 }) {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const { years: yearsParam, on } = await searchParams;
   const years = yearsParam === "10" ? 10 : 5;
 
@@ -41,19 +41,19 @@ export default async function FuturePage({
 
   const [settings, points, money, debts, goals, accounts, planned] = await Promise.all([
     prisma.settings.findUnique({ where: { userId } }),
-    projectFuture(userId, horizonYears),
+    projectFuture(userId, spaceId, horizonYears),
     getMoney(userId),
-    getDebtSummaries(userId),
+    getDebtSummaries(spaceId),
     prisma.goal.findMany({
-      where: { userId },
+      where: { spaceId },
       include: { contributions: { orderBy: { createdAt: "desc" } } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
-    prisma.plannedTransaction.findMany({ where: { userId, active: true } }),
+    prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
   ]);
   const chartPoints = points.slice(0, years * 12);
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));

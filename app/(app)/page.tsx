@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
@@ -11,23 +11,23 @@ import PayForm from "@/components/PayForm";
 import Popover from "@/components/Popover";
 
 export default async function HomePage() {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const now = monthKey();
   const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   const [user, accounts, debts, monthTx, bills, money] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
-    getDebtSummaries(userId),
+    getDebtSummaries(spaceId),
     prisma.transaction.findMany({
-      where: { userId, date: { gte: now, lt: nextMonth } },
+      where: { spaceId, date: { gte: now, lt: nextMonth } },
       include: { category: true },
     }),
     prisma.plannedTransaction.findMany({
-      where: { userId, active: true, direction: "OUT" },
+      where: { spaceId, active: true, direction: "OUT" },
       orderBy: { dayOfMonth: "asc" },
     }),
     getMoney(userId),
@@ -63,7 +63,7 @@ export default async function HomePage() {
   const spendPie = [...spendGroups.values()].sort((a, b) => b.value - a.value);
 
   const budgeted = await prisma.category.findMany({
-    where: { userId, type: "EXPENSE", budget: { gt: 0 } },
+    where: { spaceId, type: "EXPENSE", budget: { gt: 0 } },
     orderBy: { name: "asc" },
   });
   const spentByCategory = new Map<string, number>();

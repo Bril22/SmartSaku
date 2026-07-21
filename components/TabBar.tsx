@@ -20,7 +20,13 @@ function PlusIcon() {
   );
 }
 
-export default function TabBar() {
+export default function TabBar({
+  spaceName,
+  shared,
+}: {
+  spaceName?: string | null;
+  shared?: boolean;
+}) {
   const pathname = usePathname();
   // optimistic highlight: light up the tapped tab immediately, before navigation finishes
   const [clicked, setClicked] = useState<string | null>(null);
@@ -33,6 +39,15 @@ export default function TabBar() {
 
   return (
     <>
+      {spaceName && (
+        <Link
+          href="/settings/spaces"
+          className="md:hidden sticky top-0 z-30 block bg-sagedeep text-cream2 text-[11px] font-extrabold text-center py-1.5"
+        >
+          👥 {spaceName}{shared ? " · shared" : ""}
+        </Link>
+      )}
+
       {/* mobile bottom bar */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-line pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5 place-items-center pt-2 pb-2.5">
@@ -58,7 +73,15 @@ export default function TabBar() {
 
       {/* desktop sidebar */}
       <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-56 bg-card border-r border-line p-5 gap-1 z-40">
-        <div className="font-display text-2xl font-bold mb-6 px-2">SmartSaku</div>
+        <div className="font-display text-2xl font-bold mb-1 px-2">SmartSaku</div>
+        <Link
+          href="/settings/spaces"
+          className={`mb-4 mx-2 rounded-full px-3 py-1.5 text-[11px] font-extrabold text-center ${
+            spaceName ? "bg-sagedeep text-cream2" : "bg-goodbg text-sagedeep"
+          }`}
+        >
+          {spaceName ? `👥 ${spaceName}` : "🔒 Personal"}
+        </Link>
         {tabs.map((t) => (
           <Link
             key={t.href}

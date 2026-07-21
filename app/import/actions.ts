@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
 import {
   aiExtractTransactions,
@@ -16,14 +17,10 @@ import {
   type AIInput,
 } from "@/lib/importer";
 
-async function requireUser(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  return userId;
-}
+
 
 export async function startImport(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     redirect("/import?err=" + encodeURIComponent("Please choose a file"));
@@ -59,8 +56,8 @@ export async function startImport(formData: FormData) {
   }
 
   const [categories, accounts] = await Promise.all([
-    prisma.category.findMany({ where: { userId } }),
-    prisma.finAccount.findMany({ where: { userId, archived: false } }),
+    prisma.category.findMany({ where: { spaceId } }),
+    prisma.finAccount.findMany({ where: { spaceId, archived: false } }),
   ]);
 
   let rows;
@@ -90,7 +87,7 @@ export async function startImport(formData: FormData) {
   }
 
   const batch = await prisma.importBatch.create({
-    data: { userId, fileName: f.name, rows: rows as object[] },
+    data: { userId, spaceId, fileName: f.name, rows: rows as object[] },
   });
   redirect(`/import/${batch.id}`);
 }
@@ -104,7 +101,7 @@ const confirmSchema = z.array(
 );
 
 export async function confirmImport(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const batchId = String(formData.get("batchId") ?? "");
   const batch = await prisma.importBatch.findFirst({ where: { id: batchId, userId } });
   if (!batch) redirect("/import?err=" + encodeURIComponent("Import not found"));
@@ -124,8 +121,8 @@ export async function confirmImport(formData: FormData) {
   }
 
   const [accounts, categories] = await Promise.all([
-    prisma.finAccount.findMany({ where: { userId } }),
-    prisma.category.findMany({ where: { userId } }),
+    prisma.finAccount.findMany({ where: { spaceId } }),
+    prisma.category.findMany({ where: { spaceId } }),
   ]);
   const accountByName = new Map(accounts.map((a) => [a.name.toLowerCase(), a]));
   const categoryByName = new Map(categories.map((c) => [`${c.name.toLowerCase()}|${c.type}`, c]));
@@ -213,7 +210,7 @@ export async function confirmImport(formData: FormData) {
 }
 
 export async function undoImport(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const batchId = String(formData.get("batchId") ?? "");
   const batch = await prisma.importBatch.findFirst({ where: { id: batchId, userId } });
   if (!batch || batch.status !== "DONE") {
@@ -227,7 +224,7 @@ export async function undoImport(formData: FormData) {
         data: { status: "REVERTED" },
       });
       if (claimed.count === 0) return;
-      const txs = await tx.transaction.findMany({ where: { userId, importBatchId: batchId } });
+      const txs = await tx.transaction.findMany({ where: { spaceId, importBatchId: batchId } });
       for (const t of txs) {
         const effect = t.direction === "IN" ? t.amount : -t.amount;
         await tx.finAccount.update({

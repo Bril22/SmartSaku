@@ -65,6 +65,14 @@ export default async function SettingsPage() {
       </form>
 
       <div className="bg-card border border-line rounded-lg divide-y divide-line mb-4">
+        <Link href="/settings/spaces" className="px-4 py-3.5 flex items-center gap-3">
+          <span className="text-lg">👥</span>
+          <div className="flex-1">
+            <div className="font-semibold text-[13.5px]">Spaces & sharing</div>
+            <div className="text-[11.5px] text-inksoft">Track money together with someone</div>
+          </div>
+          <span className="text-inksoft">›</span>
+        </Link>
         <Link href="/settings/accounts" className="px-4 py-3.5 flex items-center gap-3">
           <span className="text-lg">🏦</span>
           <span className="flex-1 font-semibold text-[13.5px]">Manage accounts</span>

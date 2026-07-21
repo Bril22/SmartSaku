@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { getMoney } from "@/lib/money";
 import { addAccount } from "@/app/actions";
 import { deleteFinAccount, renameFinAccount, toggleArchiveAccount } from "@/app/settings/actions";
@@ -12,17 +12,17 @@ import SubmitButton from "@/components/SubmitButton";
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
 
 export default async function ManageAccountsPage() {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const [accounts, money] = await Promise.all([
     prisma.finAccount.findMany({
-      where: { userId },
+      where: { spaceId },
       orderBy: [{ archived: "asc" }, { createdAt: "asc" }, { name: "asc" }],
     }),
     getMoney(userId),
   ]);
   const txCounts = await prisma.transaction.groupBy({
     by: ["accountId"],
-    where: { userId },
+    where: { spaceId },
     _count: { _all: true },
   });
   const txBy = new Map(txCounts.map((t) => [t.accountId, t._count._all]));

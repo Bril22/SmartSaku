@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
@@ -35,7 +35,7 @@ type Search = {
 };
 
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const sp = await searchParams;
   const tab = ["accounts", "history", "debts", "plan"].includes(sp.tab ?? "") ? sp.tab! : "accounts";
   const money = await getMoney(userId);
@@ -62,30 +62,30 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
         ))}
       </div>
 
-      {tab === "accounts" && <AccountsTab userId={userId} money={money} />}
-      {tab === "history" && <HistoryTab userId={userId} money={money} sp={sp} />}
-      {tab === "debts" && <DebtsTab userId={userId} money={money} />}
-      {tab === "plan" && <PlanTab userId={userId} money={money} />}
+      {tab === "accounts" && <AccountsTab userId={userId} spaceId={spaceId} money={money} />}
+      {tab === "history" && <HistoryTab userId={userId} spaceId={spaceId} money={money} sp={sp} />}
+      {tab === "debts" && <DebtsTab userId={userId} spaceId={spaceId} money={money} />}
+      {tab === "plan" && <PlanTab userId={userId} spaceId={spaceId} money={money} />}
     </div>
   );
 }
 
-async function PlanTab({ userId, money }: { userId: string; money: MoneyCtx }) {
+async function PlanTab({ userId, spaceId, money }: Ctx) {
   const now = monthKey();
   const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const [items, accounts, categories, monthTx] = await Promise.all([
     prisma.plannedTransaction.findMany({
-      where: { userId, active: true },
+      where: { spaceId, active: true },
       include: { account: true, category: true },
       orderBy: [{ direction: "asc" }, { dayOfMonth: "asc" }],
     }),
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
-    prisma.category.findMany({ where: { userId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
+    prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
     prisma.transaction.findMany({
-      where: { userId, plannedId: { not: null }, date: { gte: now, lt: nextMonth } },
+      where: { spaceId, plannedId: { not: null }, date: { gte: now, lt: nextMonth } },
     }),
   ]);
   const recordedTxByPlanned = new Map(monthTx.map((t) => [t.plannedId as string, t.id]));
@@ -287,10 +287,11 @@ async function PlanTab({ userId, money }: { userId: string; money: MoneyCtx }) {
 }
 
 type MoneyCtx = Awaited<ReturnType<typeof getMoney>>;
+type Ctx = { userId: string; spaceId: string; money: MoneyCtx };
 
-async function AccountsTab({ userId, money }: { userId: string; money: MoneyCtx }) {
+async function AccountsTab({ userId, spaceId, money }: Ctx) {
   const accounts = await prisma.finAccount.findMany({
-    where: { userId, archived: false },
+    where: { spaceId, archived: false },
     orderBy: [{ createdAt: "asc" }, { name: "asc" }],
   });
   const total = accounts.reduce((a, x) => a + Number(x.balance), 0);
@@ -383,15 +384,7 @@ async function AccountsTab({ userId, money }: { userId: string; money: MoneyCtx 
   );
 }
 
-async function HistoryTab({
-  userId,
-  money,
-  sp,
-}: {
-  userId: string;
-  money: MoneyCtx;
-  sp: Search;
-}) {
+async function HistoryTab({ userId, spaceId, money, sp }: Ctx & { sp: Search }) {
   const now = new Date();
   const [yStr, mStr] = (sp.month ?? "").split("-");
   const year = Number(yStr) || now.getUTCFullYear();
@@ -438,12 +431,12 @@ async function HistoryTab({
 
   const [monthTxs, rangeTxs] = await Promise.all([
     prisma.transaction.findMany({
-      where: { userId, date: { gte: monthStart, lt: monthEnd } },
+      where: { spaceId, date: { gte: monthStart, lt: monthEnd } },
       include: { category: true, account: true },
       orderBy: { date: "desc" },
     }),
     prisma.transaction.findMany({
-      where: { userId, date: { gte: rangeStart, lt: rangeEnd } },
+      where: { spaceId, date: { gte: rangeStart, lt: rangeEnd } },
       include: { category: true },
     }),
   ]);
@@ -633,12 +626,12 @@ async function HistoryTab({
   );
 }
 
-async function DebtsTab({ userId, money }: { userId: string; money: MoneyCtx }) {
-  const debts = await getDebtSummaries(userId);
+async function DebtsTab({ userId, spaceId, money }: Ctx) {
+  const debts = await getDebtSummaries(spaceId);
   const totalRemaining = debts.reduce((a, d) => a + d.remaining, 0);
 
   const entries = await prisma.debtScheduleEntry.findMany({
-    where: { debt: { userId }, month: { gte: monthKey() } },
+    where: { debt: { spaceId }, month: { gte: monthKey() } },
     orderBy: { month: "asc" },
   });
   const byMonth = new Map<number, number>();

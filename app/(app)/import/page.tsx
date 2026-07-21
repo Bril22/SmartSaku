@@ -1,20 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { startImport, undoImport } from "@/app/import/actions";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function ImportPage() {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const recent = await prisma.importBatch.findMany({
-    where: { userId, status: { in: ["DONE", "REVERTED"] } },
+    where: { spaceId, status: { in: ["DONE", "REVERTED"] } },
     orderBy: { createdAt: "desc" },
     take: 5,
   });
   const txCounts = await prisma.transaction.groupBy({
     by: ["importBatchId"],
-    where: { userId, importBatchId: { in: recent.map((b) => b.id) } },
+    where: { spaceId, importBatchId: { in: recent.map((b) => b.id) } },
     _count: { _all: true },
   });
   const countBy = new Map(txCounts.map((t) => [t.importBatchId, t._count._all]));

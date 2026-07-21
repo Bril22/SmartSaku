@@ -4,24 +4,21 @@ import OpenAI from "openai";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthLabel } from "@/lib/format";
 
 const BACK = "/future";
 
-async function requireUser(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  return userId;
-}
+
 
 function back(msg: string, isError = false) {
   redirect(`${BACK}?${isError ? "err" : "ok"}=${encodeURIComponent(msg)}`);
 }
 
 export async function addGoal(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const name = String(formData.get("name") ?? "").trim();
   const icon = String(formData.get("icon") ?? "").trim() || "🎯";
   const targetAmount = Math.abs(Math.round(Number(formData.get("targetAmount") ?? 0)));
@@ -29,20 +26,20 @@ export async function addGoal(formData: FormData) {
   if (!name || !targetAmount) back("Please fill the goal name and target amount", true);
   const targetDate = dateRaw ? new Date(dateRaw + "T00:00:00Z") : null;
   await prisma.goal.create({
-    data: { userId, name, icon: icon.slice(0, 8), targetAmount: BigInt(targetAmount), targetDate },
+    data: { userId, spaceId, name, icon: icon.slice(0, 8), targetAmount: BigInt(targetAmount), targetDate },
   });
   revalidatePath(BACK);
   back(`Goal "${name}" created 🎯`);
 }
 
 export async function updateGoal(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const icon = String(formData.get("icon") ?? "").trim() || "🎯";
   const targetAmount = Math.abs(Math.round(Number(formData.get("targetAmount") ?? 0)));
   const dateRaw = String(formData.get("targetDate") ?? "");
-  const goal = await prisma.goal.findFirst({ where: { id, userId } });
+  const goal = await prisma.goal.findFirst({ where: { id, spaceId } });
   if (!goal || !name || !targetAmount) back("Could not update the goal", true);
   await prisma.goal.update({
     where: { id },
@@ -58,10 +55,10 @@ export async function updateGoal(formData: FormData) {
 }
 
 export async function deleteGoal(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const goal = await prisma.goal.findFirst({
-    where: { id, userId },
+    where: { id, spaceId },
     include: { contributions: true },
   });
   if (!goal) back("Goal not found", true);
@@ -87,11 +84,11 @@ export async function deleteGoal(formData: FormData) {
 }
 
 export async function contributeGoal(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
   const accountId = String(formData.get("accountId") ?? "");
-  const goal = await prisma.goal.findFirst({ where: { id, userId } });
+  const goal = await prisma.goal.findFirst({ where: { id, spaceId } });
   const account = await prisma.finAccount.findFirst({
     where: { id: accountId, userId, archived: false },
   });
@@ -99,8 +96,8 @@ export async function contributeGoal(formData: FormData) {
   if (!account) back("Choose which account the money comes from", true);
 
   const category = await prisma.category.upsert({
-    where: { userId_name_type: { userId, name: "Goals", type: "EXPENSE" } },
-    create: { userId, name: "Goals", type: "EXPENSE", icon: "🎯" },
+    where: { spaceId_name_type: { spaceId, name: "Goals", type: "EXPENSE" } },
+    create: { userId, spaceId, name: "Goals", type: "EXPENSE", icon: "🎯" },
     update: {},
   });
   const saved = await prisma.goalContribution.aggregate({
@@ -139,10 +136,10 @@ export async function contributeGoal(formData: FormData) {
 }
 
 export async function deleteGoalContribution(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const contribution = await prisma.goalContribution.findFirst({
-    where: { id, goal: { userId } },
+    where: { id, goal: { spaceId } },
   });
   if (!contribution) back("Contribution not found", true);
   await prisma.$transaction(async (tx) => {
@@ -165,18 +162,18 @@ export async function deleteGoalContribution(formData: FormData) {
 }
 
 export async function askGoalAdvice(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const goal = await prisma.goal.findFirst({
-    where: { id, userId },
+    where: { id, spaceId },
     include: { contributions: true },
   });
   if (!goal) back("Goal not found", true);
 
   const [debts, accounts, planned, settings] = await Promise.all([
-    getDebtSummaries(userId),
-    prisma.finAccount.findMany({ where: { userId, archived: false } }),
-    prisma.plannedTransaction.findMany({ where: { userId, active: true } }),
+    getDebtSummaries(spaceId),
+    prisma.finAccount.findMany({ where: { spaceId, archived: false } }),
+    prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
     prisma.settings.findUnique({ where: { userId } }),
   ]);
   const savings = accounts.reduce((a, x) => a + Number(x.balance), 0);

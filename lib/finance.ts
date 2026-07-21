@@ -16,28 +16,28 @@ export type DebtSummary = {
   progressPct: number;
 };
 
-export async function getDebtSummaries(userId: string): Promise<DebtSummary[]> {
+export async function getDebtSummaries(spaceId: string): Promise<DebtSummary[]> {
   const now = monthKey();
   const [debts, planned, paid, adjusted, thisMonthEntries, thisMonthPayments] = await Promise.all([
-    prisma.debt.findMany({ where: { userId }, orderBy: { lender: "asc" } }),
+    prisma.debt.findMany({ where: { spaceId }, orderBy: { lender: "asc" } }),
     prisma.debtScheduleEntry.groupBy({
       by: ["debtId"],
-      where: { debt: { userId }, planned: { gt: 0 } },
+      where: { debt: { spaceId }, planned: { gt: 0 } },
       _sum: { planned: true },
       _max: { month: true },
     }),
     prisma.debtPayment.groupBy({
       by: ["debtId"],
-      where: { debt: { userId } },
+      where: { debt: { spaceId } },
       _sum: { amount: true },
     }),
     prisma.debtAdjustment.groupBy({
       by: ["debtId"],
-      where: { debt: { userId } },
+      where: { debt: { spaceId } },
       _sum: { delta: true },
     }),
-    prisma.debtScheduleEntry.findMany({ where: { debt: { userId }, month: now } }),
-    prisma.debtPayment.findMany({ where: { debt: { userId }, month: now } }),
+    prisma.debtScheduleEntry.findMany({ where: { debt: { spaceId }, month: now } }),
+    prisma.debtPayment.findMany({ where: { debt: { spaceId }, month: now } }),
   ]);
 
   const plannedBy = new Map(planned.map((p) => [p.debtId, p]));
@@ -96,12 +96,12 @@ export type ProjectionPoint = {
  * (future months only, scaled by outstanding adjustments); income grows
  * yearly, living costs inflate yearly, savings earn interest monthly.
  */
-export async function projectFuture(userId: string, years: number): Promise<ProjectionPoint[]> {
+export async function projectFuture(userId: string, spaceId: string, years: number): Promise<ProjectionPoint[]> {
   const [settings, accounts, debts, plannedItems] = await Promise.all([
     prisma.settings.findUnique({ where: { userId } }),
-    prisma.finAccount.findMany({ where: { userId } }),
-    prisma.debt.findMany({ where: { userId }, include: { schedule: true, payments: true, adjustments: true } }),
-    prisma.plannedTransaction.findMany({ where: { userId, active: true } }),
+    prisma.finAccount.findMany({ where: { spaceId } }),
+    prisma.debt.findMany({ where: { spaceId }, include: { schedule: true, payments: true, adjustments: true } }),
+    prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
   ]);
   const plannedIn = plannedItems
     .filter((p) => p.direction === "IN")
@@ -127,7 +127,7 @@ export async function projectFuture(userId: string, years: number): Promise<Proj
   // planned items already recorded this month are in the balances — don't count them twice
   const startNext = addMonths(start, 1);
   const recordedThisMonth = await prisma.transaction.findMany({
-    where: { userId, plannedId: { not: null }, date: { gte: start, lt: startNext } },
+    where: { spaceId, plannedId: { not: null }, date: { gte: start, lt: startNext } },
   });
   const recordedIn = recordedThisMonth
     .filter((t) => t.direction === "IN")

@@ -47,7 +47,7 @@ export function DebtCurve({
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#6F6350" }} interval="preserveStartEnd" minTickGap={40} />
           <YAxis tick={{ fontSize: 10, fill: "#6F6350" }} tickFormatter={fmt.short} width={42} />
           <Tooltip formatter={(v) => fmt.full(Number(v))} contentStyle={{ borderRadius: 12, border: "1px solid #EBDCC3", fontSize: 12 }} />
-          <Area type="monotone" dataKey="debt" name="Debt remaining" stroke="#C96F4A" strokeWidth={2.5} fill="#F3E0CE" />
+          <Area isAnimationActive={false} type="monotone" dataKey="debt" name="Debt remaining" stroke="#C96F4A" strokeWidth={2.5} fill="#F3E0CE" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -69,8 +69,8 @@ export function FutureChart({
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#6F6350" }} interval="preserveStartEnd" minTickGap={50} />
           <YAxis tick={{ fontSize: 10, fill: "#6F6350" }} tickFormatter={fmt.short} width={46} />
           <Tooltip formatter={(v) => fmt.full(Number(v))} contentStyle={{ borderRadius: 12, border: "1px solid #EBDCC3", fontSize: 12 }} />
-          <Area type="monotone" dataKey="savings" name="Savings" stroke="#31694E" strokeWidth={2.5} fill="rgba(187,200,99,.3)" />
-          <Area type="monotone" dataKey="debt" name="Debt remaining" stroke="#C96F4A" strokeWidth={2} fill="rgba(232,160,124,.2)" />
+          <Area isAnimationActive={false} type="monotone" dataKey="savings" name="Savings" stroke="#31694E" strokeWidth={2.5} fill="rgba(187,200,99,.3)" />
+          <Area isAnimationActive={false} type="monotone" dataKey="debt" name="Debt remaining" stroke="#C96F4A" strokeWidth={2} fill="rgba(232,160,124,.2)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>

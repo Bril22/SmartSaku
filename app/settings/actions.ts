@@ -5,21 +5,18 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { requireSpace } from "@/lib/space";
 import { destroySession, getSessionUserId } from "@/lib/auth";
 import { CURRENCIES } from "@/lib/money";
 
-async function requireUser(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  return userId;
-}
+
 
 function back(path: string, msg: string, isError = false) {
   redirect(`${path}?${isError ? "err" : "ok"}=${encodeURIComponent(msg)}`);
 }
 
 export async function updateProfileName(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const parsed = z.string().trim().min(1).max(40).safeParse(formData.get("name"));
   if (!parsed.success) back("/settings", "Name cannot be empty", true);
   await prisma.user.update({ where: { id: userId }, data: { name: parsed.data! } });
@@ -28,7 +25,7 @@ export async function updateProfileName(formData: FormData) {
 }
 
 export async function updateCurrency(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const code = String(formData.get("currency") ?? "IDR");
   if (!CURRENCIES[code]) back("/settings", "Unknown currency", true);
   await prisma.settings.upsert({
@@ -41,7 +38,7 @@ export async function updateCurrency(formData: FormData) {
 }
 
 export async function changePassword(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const schema = z.object({
     current: z.string().min(1),
     next: z.string().min(8),
@@ -67,7 +64,7 @@ export async function changePassword(formData: FormData) {
 }
 
 export async function deleteMyAccount(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const email = String(formData.get("confirmEmail") ?? "").trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.email !== email) {
@@ -81,19 +78,19 @@ export async function deleteMyAccount(formData: FormData) {
 /* ---------- accounts ---------- */
 
 export async function renameFinAccount(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const parsed = z.string().trim().min(1).max(40).safeParse(formData.get("name"));
   if (!parsed.success) back("/settings/accounts", "Name cannot be empty", true);
-  await prisma.finAccount.updateMany({ where: { id, userId }, data: { name: parsed.data! } });
+  await prisma.finAccount.updateMany({ where: { id, spaceId }, data: { name: parsed.data! } });
   revalidatePath("/", "layout");
   back("/settings/accounts", "Account renamed");
 }
 
 export async function toggleArchiveAccount(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
-  const account = await prisma.finAccount.findFirst({ where: { id, userId } });
+  const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
   if (!account) back("/settings/accounts", "Account not found", true);
   await prisma.finAccount.update({ where: { id }, data: { archived: !account!.archived } });
   revalidatePath("/", "layout");
@@ -101,13 +98,13 @@ export async function toggleArchiveAccount(formData: FormData) {
 }
 
 export async function deleteFinAccount(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const mode = String(formData.get("mode") ?? "move");
   const targetId = String(formData.get("targetAccountId") ?? "");
   const path = "/settings/accounts";
 
-  const account = await prisma.finAccount.findFirst({ where: { id, userId } });
+  const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
   if (!account) back(path, "Account not found", true);
   const txCount = await prisma.transaction.count({ where: { accountId: id, userId } });
 
@@ -125,11 +122,11 @@ export async function deleteFinAccount(formData: FormData) {
     await prisma.$transaction(
       async (tx) => {
         await tx.transaction.updateMany({
-          where: { userId, accountId: id },
+          where: { spaceId, accountId: id },
           data: { accountId: target!.id },
         });
         await tx.plannedTransaction.updateMany({
-          where: { userId, accountId: id },
+          where: { spaceId, accountId: id },
           data: { accountId: target!.id },
         });
         await tx.finAccount.update({
@@ -149,7 +146,7 @@ export async function deleteFinAccount(formData: FormData) {
 
   await prisma.$transaction(
     async (tx) => {
-      const txs = await tx.transaction.findMany({ where: { userId, accountId: id } });
+      const txs = await tx.transaction.findMany({ where: { spaceId, accountId: id } });
       const txIds = txs.map((t) => t.id);
       const payments = await tx.debtPayment.findMany({ where: { transactionId: { in: txIds } } });
       for (const p of payments) {
@@ -180,7 +177,7 @@ const categorySchema = z.object({
 });
 
 export async function addCategory(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
     icon: formData.get("icon") || "🏷️",
@@ -188,16 +185,16 @@ export async function addCategory(formData: FormData) {
   });
   if (!parsed.success) back("/settings/categories", "Please fill the category name", true);
   const { name, icon, type } = parsed.data!;
-  const exists = await prisma.category.findFirst({ where: { userId, name, type } });
+  const exists = await prisma.category.findFirst({ where: { spaceId, name, type } });
   if (exists) back("/settings/categories", `"${name}" already exists`, true);
-  await prisma.category.create({ data: { userId, name, icon, type } });
+  await prisma.category.create({ data: { userId, spaceId, name, icon, type } });
   back("/settings/categories", `Category "${name}" added`);
 }
 
 export async function updateCategory(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
-  const existing = await prisma.category.findFirst({ where: { id, userId } });
+  const existing = await prisma.category.findFirst({ where: { id, spaceId } });
   if (!existing) back("/settings/categories", "Category not found", true);
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
@@ -208,7 +205,7 @@ export async function updateCategory(formData: FormData) {
   const { name, icon } = parsed.data!;
   const budget = Math.abs(Math.round(Number(formData.get("budget") ?? 0)));
   const conflict = await prisma.category.findFirst({
-    where: { userId, name, type: existing!.type, NOT: { id } },
+    where: { spaceId, name, type: existing!.type, NOT: { id } },
   });
   if (conflict) back("/settings/categories", `"${name}" already exists`, true);
   await prisma.category.update({ where: { id }, data: { name, icon, budget: BigInt(budget) } });
@@ -217,9 +214,9 @@ export async function updateCategory(formData: FormData) {
 }
 
 export async function deleteCategory(formData: FormData) {
-  const userId = await requireUser();
+  const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
-  await prisma.category.deleteMany({ where: { id, userId } });
+  await prisma.category.deleteMany({ where: { id, spaceId } });
   revalidatePath("/", "layout");
   back("/settings/categories", "Category deleted — its transactions are kept");
 }

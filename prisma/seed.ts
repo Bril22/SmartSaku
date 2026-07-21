@@ -43,6 +43,20 @@ async function main() {
   });
   console.log("User:", user.email);
 
+  let personal = await prisma.space.findFirst({
+    where: { personal: true, members: { some: { userId: user.id } } },
+  });
+  if (!personal) {
+    personal = await prisma.space.create({
+      data: {
+        name: "Personal",
+        personal: true,
+        members: { create: { userId: user.id, role: "OWNER" } },
+      },
+    });
+  }
+  const spaceId = personal.id;
+
   // settings
   await prisma.settings.upsert({
     where: { userId: user.id },
@@ -61,12 +75,12 @@ async function main() {
   });
 
   // accounts (only if none yet)
-  const accountCount = await prisma.finAccount.count({ where: { userId: user.id } });
+  const accountCount = await prisma.finAccount.count({ where: { spaceId } });
   if (accountCount === 0) {
     await prisma.finAccount.createMany({
       data: [
-        { userId: user.id, name: "Bank (main)", type: "BANK", balance: 12_000_000n },
-        { userId: user.id, name: "Savings", type: "SAVINGS", balance: 0n },
+        { userId: user.id, spaceId, name: "Bank (main)", type: "BANK", balance: 12_000_000n },
+        { userId: user.id, spaceId, name: "Savings", type: "SAVINGS", balance: 0n },
       ],
     });
     console.log("Accounts created (starting savings Rp12.000.000)");
@@ -84,23 +98,23 @@ async function main() {
   ];
   for (const c of cats) {
     await prisma.category.upsert({
-      where: { userId_name_type: { userId: user.id, name: c.name, type: c.type } },
-      create: { userId: user.id, ...c },
+      where: { spaceId_name_type: { spaceId, name: c.name, type: c.type } },
+      create: { userId: user.id, spaceId, ...c },
       update: {},
     });
   }
 
   // monthly transaction plan from living costs
-  const planCount = await prisma.plannedTransaction.count({ where: { userId: user.id } });
+  const planCount = await prisma.plannedTransaction.count({ where: { spaceId } });
   if (planCount === 0) {
-    const rentCat = await prisma.category.findFirst({ where: { userId: user.id, name: "Rent" } });
-    const famCat = await prisma.category.findFirst({ where: { userId: user.id, name: "Family" } });
-    const salaryCat = await prisma.category.findFirst({ where: { userId: user.id, name: "Salary" } });
+    const rentCat = await prisma.category.findFirst({ where: { spaceId, name: "Rent" } });
+    const famCat = await prisma.category.findFirst({ where: { spaceId, name: "Family" } });
+    const salaryCat = await prisma.category.findFirst({ where: { spaceId, name: "Salary" } });
     await prisma.plannedTransaction.createMany({
       data: [
-        { userId: user.id, name: "Salary", amount: 27_500_000n, direction: "IN", dayOfMonth: 1, categoryId: salaryCat?.id },
-        { userId: user.id, name: "Rent", amount: 4_000_000n, direction: "OUT", dayOfMonth: 28, categoryId: rentCat?.id },
-        { userId: user.id, name: "Family support", amount: 3_000_000n, direction: "OUT", dayOfMonth: 1, categoryId: famCat?.id },
+        { userId: user.id, spaceId, name: "Salary", amount: 27_500_000n, direction: "IN", dayOfMonth: 1, categoryId: salaryCat?.id },
+        { userId: user.id, spaceId, name: "Rent", amount: 4_000_000n, direction: "OUT", dayOfMonth: 28, categoryId: rentCat?.id },
+        { userId: user.id, spaceId, name: "Family support", amount: 3_000_000n, direction: "OUT", dayOfMonth: 1, categoryId: famCat?.id },
       ],
     });
   }
@@ -108,8 +122,8 @@ async function main() {
   // debts + schedules
   for (const [lender, arr] of Object.entries(BASELINE)) {
     const debt = await prisma.debt.upsert({
-      where: { userId_lender: { userId: user.id, lender } },
-      create: { userId: user.id, lender, color: COLORS[lender] ?? "#E8A07C" },
+      where: { spaceId_lender: { spaceId, lender } },
+      create: { userId: user.id, spaceId, lender, color: COLORS[lender] ?? "#E8A07C" },
       update: {},
     });
     const existing = await prisma.debtScheduleEntry.count({ where: { debtId: debt.id } });

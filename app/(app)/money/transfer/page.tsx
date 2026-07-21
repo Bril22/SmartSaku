@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { getMoney } from "@/lib/money";
 import { transferBetweenAccounts } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
@@ -8,10 +8,10 @@ import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function TransferPage() {
-  const userId = await requireUserId();
+  const { userId, spaceId } = await requireSpace();
   const [accounts, money] = await Promise.all([
     prisma.finAccount.findMany({
-      where: { userId, archived: false },
+      where: { spaceId, archived: false },
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
     getMoney(userId),
