@@ -1,0 +1,198 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { getSessionUserId } from "@/lib/auth";
+import {
+  aiExtractTransactions,
+  extractFileText,
+  importRowSchema,
+  MAX_FILE_BYTES,
+} from "@/lib/importer";
+
+async function requireUser(): Promise<string> {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+  return userId;
+}
+
+export async function startImport(formData: FormData) {
+  const userId = await requireUser();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect("/import?err=" + encodeURIComponent("Please choose a file"));
+  }
+  const f = file as File;
+  if (f.size > MAX_FILE_BYTES) {
+    redirect("/import?err=" + encodeURIComponent("File is too large — max 2 MB"));
+  }
+
+  let text = "";
+  try {
+    text = await extractFileText(f);
+  } catch (e) {
+    redirect("/import?err=" + encodeURIComponent((e as Error).message));
+  }
+  if (text.trim().length < 40) {
+    redirect(
+      "/import?err=" +
+        encodeURIComponent(
+          "Could not read text from this file. Scanned/image PDFs are not supported yet.",
+        ),
+    );
+  }
+
+  const [categories, accounts] = await Promise.all([
+    prisma.category.findMany({ where: { userId } }),
+    prisma.finAccount.findMany({ where: { userId, archived: false } }),
+  ]);
+
+  let rows;
+  try {
+    rows = await aiExtractTransactions(
+      text,
+      categories.map((c) => c.name),
+      accounts.map((a) => a.name),
+    );
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status === 429) {
+      redirect(
+        "/import?err=" +
+          encodeURIComponent(
+            "Your OpenAI account has no API credit. Add credit at platform.openai.com/settings/organization/billing, then try again.",
+          ),
+      );
+    }
+    if (status === 401) {
+      redirect("/import?err=" + encodeURIComponent("OpenAI API key is invalid — check OPENAI_API_KEY"));
+    }
+    redirect("/import?err=" + encodeURIComponent("The AI could not process this file. Try again."));
+  }
+  if (!rows || rows.length === 0) {
+    redirect("/import?err=" + encodeURIComponent("No transactions found in this file"));
+  }
+
+  const batch = await prisma.importBatch.create({
+    data: { userId, fileName: f.name, rows: rows as object[] },
+  });
+  redirect(`/import/${batch.id}`);
+}
+
+const confirmSchema = z.array(
+  importRowSchema.extend({
+    include: z.boolean(),
+    accountName: z.string().trim().min(1).max(40),
+    categoryName: z.string().trim().max(40),
+  }),
+);
+
+export async function confirmImport(formData: FormData) {
+  const userId = await requireUser();
+  const batchId = String(formData.get("batchId") ?? "");
+  const batch = await prisma.importBatch.findFirst({ where: { id: batchId, userId } });
+  if (!batch) redirect("/import?err=" + encodeURIComponent("Import not found"));
+  if (batch!.status === "DONE") {
+    redirect("/money?tab=history&ok=" + encodeURIComponent("This file was already imported"));
+  }
+
+  let rows;
+  try {
+    rows = confirmSchema.parse(JSON.parse(String(formData.get("rows") ?? "[]")));
+  } catch {
+    redirect(`/import/${batchId}?err=` + encodeURIComponent("Some rows are invalid — check dates and amounts"));
+  }
+  const selected = rows!.filter((r) => r.include);
+  if (selected.length === 0) {
+    redirect(`/import/${batchId}?err=` + encodeURIComponent("No rows selected"));
+  }
+
+  const [accounts, categories] = await Promise.all([
+    prisma.finAccount.findMany({ where: { userId } }),
+    prisma.category.findMany({ where: { userId } }),
+  ]);
+  const accountByName = new Map(accounts.map((a) => [a.name.toLowerCase(), a]));
+  const categoryByName = new Map(categories.map((c) => [`${c.name.toLowerCase()}|${c.type}`, c]));
+
+  let imported = 0;
+  let duplicates = 0;
+
+  await prisma.$transaction(
+    async (tx) => {
+      const claimed = await tx.importBatch.updateMany({
+        where: { id: batchId, status: "DRAFT" },
+        data: { status: "DONE" },
+      });
+      if (claimed.count === 0) return;
+
+      for (const r of selected) {
+        let account = accountByName.get(r.accountName.toLowerCase());
+        if (!account) {
+          account = await tx.finAccount.create({
+            data: { userId, name: r.accountName, type: "BANK", balance: 0n },
+          });
+          accountByName.set(r.accountName.toLowerCase(), account);
+        }
+
+        let categoryId: string | null = null;
+        if (r.categoryName) {
+          const type = r.direction === "IN" ? "INCOME" : "EXPENSE";
+          const key = `${r.categoryName.toLowerCase()}|${type}`;
+          let category = categoryByName.get(key);
+          if (!category) {
+            category = await tx.category.create({
+              data: { userId, name: r.categoryName, type, icon: r.direction === "IN" ? "💰" : "🏷️" },
+            });
+            categoryByName.set(key, category);
+          }
+          categoryId = category.id;
+        }
+
+        const date = new Date(r.date + "T08:00:00Z");
+        const dupe = await tx.transaction.findFirst({
+          where: {
+            userId,
+            accountId: account.id,
+            date,
+            amount: BigInt(r.amount),
+            direction: r.direction,
+            note: r.note,
+          },
+        });
+        if (dupe) {
+          duplicates++;
+          continue;
+        }
+
+        await tx.transaction.create({
+          data: {
+            userId,
+            accountId: account.id,
+            categoryId,
+            date,
+            amount: BigInt(r.amount),
+            direction: r.direction,
+            note: r.note,
+          },
+        });
+        await tx.finAccount.update({
+          where: { id: account.id },
+          data: {
+            balance: { [r.direction === "IN" ? "increment" : "decrement"]: BigInt(r.amount) },
+          },
+        });
+        imported++;
+      }
+    },
+    { timeout: 30_000 },
+  );
+
+  revalidatePath("/", "layout");
+  const msg =
+    `Imported ${imported} transaction${imported === 1 ? "" : "s"}` +
+    (duplicates > 0 ? ` — ${duplicates} duplicate${duplicates === 1 ? "" : "s"} skipped` : "") +
+    " 📄✨";
+  redirect("/money?tab=history&ok=" + encodeURIComponent(msg) + "&fx=paid");
+}

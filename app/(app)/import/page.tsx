@@ -1,0 +1,56 @@
+import Image from "next/image";
+import Link from "next/link";
+import { requireUserId } from "@/lib/auth";
+import { startImport } from "@/app/import/actions";
+import SubmitButton from "@/components/SubmitButton";
+
+export default async function ImportPage() {
+  await requireUserId();
+  return (
+    <div className="max-w-md mx-auto">
+      <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
+        ‹ History
+      </Link>
+      <h1 className="font-display text-2xl font-semibold mt-1 mb-2">Import from file</h1>
+      <p className="text-sm text-inksoft mb-5">
+        Upload a bank statement or expense sheet — Saku-Kun reads it and turns it into
+        transactions you can review before saving.
+      </p>
+
+      <div className="bg-card border border-line rounded-lg p-5 mb-4">
+        <Image
+          src="/brand/mascot-sorting.png"
+          alt="Saku-Kun sorting coins"
+          width={140}
+          height={98}
+          className="mx-auto mb-4"
+        />
+        <form action={startImport} className="space-y-3">
+          <input
+            type="file"
+            name="file"
+            required
+            accept=".xlsx,.xls,.csv,.pdf"
+            className="w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-goodbg file:text-sagedeep file:font-bold file:px-4 file:py-2.5 file:cursor-pointer"
+          />
+          <SubmitButton
+            className="w-full rounded-full bg-sagedeep text-cream2 font-bold py-3.5 text-sm"
+            pendingText="Reading your file with AI…"
+          >
+            Read file
+          </SubmitButton>
+        </form>
+      </div>
+
+      <ul className="text-[11.5px] text-inksoft space-y-1.5">
+        <li>• Supported: Excel (.xlsx/.xls), CSV, and text-based PDF — max 2 MB, 300 rows.</li>
+        <li>• Scanned/photo PDFs are not supported yet.</li>
+        <li>
+          • The file content is sent to OpenAI to be read. Do not upload files you don&apos;t want
+          processed there.
+        </li>
+        <li>• Nothing is saved until you review and confirm the preview.</li>
+      </ul>
+    </div>
+  );
+}

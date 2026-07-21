@@ -227,6 +227,15 @@ async function HistoryTab({
   const nextMonth = `${month === 11 ? year + 1 : year}-${String(month === 11 ? 1 : month + 2).padStart(2, "0")}`;
 
   return (
+    <div>
+    <div className="flex justify-end mb-3 -mt-2">
+      <Link
+        href="/import"
+        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-4 py-2 text-xs font-extrabold text-sagedeep"
+      >
+        📄 Import from file (AI)
+      </Link>
+    </div>
     <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
       <div className="bg-card border border-line rounded-lg p-4 mb-5 md:mb-0">
         <div className="flex items-center justify-between mb-2">
@@ -315,6 +324,7 @@ async function HistoryTab({
           fmtShort={{ code: money.code, ratePerIdr: money.ratePerIdr, symbol: money.symbol }}
         />
       </div>
+    </div>
     </div>
   );
 }

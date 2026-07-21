@@ -22,6 +22,17 @@ model User {
   bills        RecurringBill[]
   snapshots    MonthlySnapshot[]
   settings     Settings?
+  imports      ImportBatch[]
+}
+
+model ImportBatch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName  String
+  status    String   @default("DRAFT")
+  rows      Json
+  createdAt DateTime @default(now())
 }
 
 enum AccountType {

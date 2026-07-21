@@ -42,7 +42,7 @@ export default function TabBar() {
           <div className="relative w-full h-full">
             <Link
               href="/add"
-              aria-label="Quick add"
+              aria-label="Add Transaction"
               onClick={() => setClicked("/add")}
               className="absolute left-1/2 -translate-x-1/2 -top-8 rounded-full bg-peachdeep text-white flex items-center justify-center shadow-[0_6px_16px_rgba(201,111,74,.4)]"
               style={{ width: 52, height: 52 }}
@@ -78,7 +78,7 @@ export default function TabBar() {
             isActive("/add") ? "bg-ink text-cream2" : "bg-peachdeep text-white"
           }`}
         >
-          <PlusIcon /> Quick add
+          <PlusIcon /> Add Transaction
         </Link>
         <div className="mt-auto flex justify-center pb-2">
           <Image src="/brand/mascot-sorting.png" alt="Saku-Kun sorting coins" width={150} height={105} />
