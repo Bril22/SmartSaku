@@ -189,6 +189,7 @@ export async function confirmImport(formData: FormData) {
             amount: BigInt(r.amount),
             direction: r.direction,
             note: r.note,
+            importBatchId: batchId,
           },
         });
         await tx.finAccount.update({
@@ -207,6 +208,45 @@ export async function confirmImport(formData: FormData) {
   const msg =
     `Imported ${imported} transaction${imported === 1 ? "" : "s"}` +
     (duplicates > 0 ? ` — ${duplicates} duplicate${duplicates === 1 ? "" : "s"} skipped` : "") +
-    " 📄✨";
+    " 📄✨ (undo anytime from the Import page)";
   redirect("/money?tab=history&ok=" + encodeURIComponent(msg) + "&fx=paid");
+}
+
+export async function undoImport(formData: FormData) {
+  const userId = await requireUser();
+  const batchId = String(formData.get("batchId") ?? "");
+  const batch = await prisma.importBatch.findFirst({ where: { id: batchId, userId } });
+  if (!batch || batch.status !== "DONE") {
+    redirect("/import?err=" + encodeURIComponent("This import cannot be undone"));
+  }
+  let reverted = 0;
+  await prisma.$transaction(
+    async (tx) => {
+      const claimed = await tx.importBatch.updateMany({
+        where: { id: batchId, status: "DONE" },
+        data: { status: "REVERTED" },
+      });
+      if (claimed.count === 0) return;
+      const txs = await tx.transaction.findMany({ where: { userId, importBatchId: batchId } });
+      for (const t of txs) {
+        const effect = t.direction === "IN" ? t.amount : -t.amount;
+        await tx.finAccount.update({
+          where: { id: t.accountId },
+          data: { balance: { decrement: effect } },
+        });
+        await tx.debtPayment.updateMany({
+          where: { transactionId: t.id },
+          data: { transactionId: null },
+        });
+        await tx.transaction.delete({ where: { id: t.id } });
+        reverted++;
+      }
+    },
+    { timeout: 30_000 },
+  );
+  revalidatePath("/", "layout");
+  redirect(
+    "/import?ok=" +
+      encodeURIComponent(`Import undone — ${reverted} transactions removed, balances restored`),
+  );
 }

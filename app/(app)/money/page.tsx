@@ -9,6 +9,7 @@ import {
   addDebt,
   addPlanned,
   deletePlanned,
+  deleteTransaction,
   recordPlanned,
   updateAccountBalance,
   updatePlanned,
@@ -86,7 +87,7 @@ async function PlanTab({ userId, money }: { userId: string; money: MoneyCtx }) {
       where: { userId, plannedId: { not: null }, date: { gte: now, lt: nextMonth } },
     }),
   ]);
-  const recordedIds = new Set(monthTx.map((t) => t.plannedId as string));
+  const recordedTxByPlanned = new Map(monthTx.map((t) => [t.plannedId as string, t.id]));
   const income = items.filter((i) => i.direction === "IN");
   const expense = items.filter((i) => i.direction === "OUT");
   const plannedIn = income.reduce((a, i) => a + Number(i.amount), 0);
@@ -115,7 +116,8 @@ async function PlanTab({ userId, money }: { userId: string; money: MoneyCtx }) {
           </div>
         )}
         {list.map((i) => {
-          const recorded = recordedIds.has(i.id);
+          const recordedTxId = recordedTxByPlanned.get(i.id);
+          const recorded = !!recordedTxId;
           return (
             <div key={i.id} className="bg-card border border-line rounded-md p-3 flex items-center gap-2.5">
               <span className="text-base">{i.category?.icon ?? (direction === "IN" ? "💰" : "🧾")}</span>
@@ -134,7 +136,23 @@ async function PlanTab({ userId, money }: { userId: string; money: MoneyCtx }) {
                 {money.rpShort(Number(i.amount))}
               </span>
               {recorded ? (
-                <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-2.5 py-1.5">✓</span>
+                <Popover
+                  trigger="✓ ▾"
+                  triggerClass="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-2.5 py-1.5"
+                  width="w-56"
+                >
+                  <div className="text-[11px] font-bold text-good">Recorded this month</div>
+                  <form action={deleteTransaction}>
+                    <input type="hidden" name="id" value={recordedTxId} />
+                    <input type="hidden" name="backTo" value="/money?tab=plan" />
+                    <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
+                      Undo record
+                    </button>
+                  </form>
+                  <p className="text-[10px] text-inksoft">
+                    Removes this month&apos;s transaction and restores the balance.
+                  </p>
+                </Popover>
               ) : (
                 <form action={recordPlanned}>
                   <input type="hidden" name="id" value={i.id} />

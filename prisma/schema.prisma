@@ -155,9 +155,10 @@ model Transaction {
   date       DateTime   @default(now())
   amount     BigInt
   direction  Direction
-  note         String    @default("")
-  plannedId    String?
-  plannedMonth DateTime? @db.Date
+  note          String    @default("")
+  plannedId     String?
+  plannedMonth  DateTime? @db.Date
+  importBatchId String?
 
   @@unique([plannedId, plannedMonth])
   @@index([userId, date])

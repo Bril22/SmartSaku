@@ -5,7 +5,7 @@ import { requireUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
-import { recordPlanned } from "@/app/actions";
+import { deleteTransaction, recordPlanned } from "@/app/actions";
 import CategoryPie from "@/components/CategoryPie";
 import PayForm from "@/components/PayForm";
 import Popover from "@/components/Popover";
@@ -32,8 +32,8 @@ export default async function HomePage() {
     }),
     getMoney(userId),
   ]);
-  const recordedPlannedIds = new Set(
-    monthTx.filter((t) => t.plannedId).map((t) => t.plannedId as string),
+  const recordedTxByPlanned = new Map(
+    monthTx.filter((t) => t.plannedId).map((t) => [t.plannedId as string, t.id]),
   );
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));
 
@@ -194,7 +194,13 @@ export default async function HomePage() {
                 : money.rpShort(d.thisMonthPlanned)}
             </div>
             {d.thisMonthStatus === "PAID" ? (
-              <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">Paid</span>
+              <Link
+                href={`/debts/${d.id}`}
+                className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                title="Open to edit or undo"
+              >
+                Paid ›
+              </Link>
             ) : (
               <Popover
                 trigger={d.thisMonthStatus === "PARTIAL" ? "Pay more" : "Pay ▾"}
@@ -214,7 +220,8 @@ export default async function HomePage() {
         ))}
 
         {bills.map((b) => {
-          const recorded = recordedPlannedIds.has(b.id);
+          const recordedTxId = recordedTxByPlanned.get(b.id);
+          const recorded = !!recordedTxId;
           return (
             <div key={b.id} className="bg-card border border-line rounded-md p-3 flex items-center gap-3">
               <div
@@ -229,7 +236,23 @@ export default async function HomePage() {
               </div>
               <div className="font-extrabold text-[13px] money whitespace-nowrap">{money.rpShort(Number(b.amount))}</div>
               {recorded ? (
-                <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">Paid</span>
+                <Popover
+                  trigger="Paid ▾"
+                  triggerClass="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                  width="w-56"
+                >
+                  <div className="text-[11px] font-bold text-good">Recorded this month</div>
+                  <form action={deleteTransaction}>
+                    <input type="hidden" name="id" value={recordedTxId} />
+                    <input type="hidden" name="backTo" value="/?home=1" />
+                    <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
+                      Undo record
+                    </button>
+                  </form>
+                  <p className="text-[10px] text-inksoft">
+                    Removes this month&apos;s transaction and restores the balance.
+                  </p>
+                </Popover>
               ) : (
                 <form action={recordPlanned}>
                   <input type="hidden" name="id" value={b.id} />
