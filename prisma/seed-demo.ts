@@ -65,10 +65,11 @@ async function main() {
     catIds[c.name] = cat.id;
   }
 
-  await prisma.recurringBill.createMany({
+  await prisma.plannedTransaction.createMany({
     data: [
-      { userId: user.id, name: "Kos/Rent", amount: 2_500_000n, dueDay: 28, categoryId: catIds.Rent },
-      { userId: user.id, name: "Internet", amount: 350_000n, dueDay: 5, categoryId: catIds.Fun },
+      { userId: user.id, name: "Gaji bulanan", amount: 15_000_000n, direction: "IN", dayOfMonth: 1, categoryId: catIds.Salary },
+      { userId: user.id, name: "Kos/Rent", amount: 2_500_000n, direction: "OUT", dayOfMonth: 28, categoryId: catIds.Rent },
+      { userId: user.id, name: "Internet", amount: 350_000n, direction: "OUT", dayOfMonth: 5, categoryId: catIds.Fun },
     ],
   });
 

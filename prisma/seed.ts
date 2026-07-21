@@ -90,15 +90,17 @@ async function main() {
     });
   }
 
-  // recurring bills from living costs
-  const billCount = await prisma.recurringBill.count({ where: { userId: user.id } });
-  if (billCount === 0) {
+  // monthly transaction plan from living costs
+  const planCount = await prisma.plannedTransaction.count({ where: { userId: user.id } });
+  if (planCount === 0) {
     const rentCat = await prisma.category.findFirst({ where: { userId: user.id, name: "Rent" } });
     const famCat = await prisma.category.findFirst({ where: { userId: user.id, name: "Family" } });
-    await prisma.recurringBill.createMany({
+    const salaryCat = await prisma.category.findFirst({ where: { userId: user.id, name: "Salary" } });
+    await prisma.plannedTransaction.createMany({
       data: [
-        { userId: user.id, name: "Rent", amount: 4_000_000n, dueDay: 28, categoryId: rentCat?.id },
-        { userId: user.id, name: "Family support", amount: 3_000_000n, dueDay: 1, categoryId: famCat?.id },
+        { userId: user.id, name: "Salary", amount: 27_500_000n, direction: "IN", dayOfMonth: 1, categoryId: salaryCat?.id },
+        { userId: user.id, name: "Rent", amount: 4_000_000n, direction: "OUT", dayOfMonth: 28, categoryId: rentCat?.id },
+        { userId: user.id, name: "Family support", amount: 3_000_000n, direction: "OUT", dayOfMonth: 1, categoryId: famCat?.id },
       ],
     });
   }

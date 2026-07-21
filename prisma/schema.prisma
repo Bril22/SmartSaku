@@ -20,6 +20,7 @@ model User {
   categories   Category[]
   transactions Transaction[]
   bills        RecurringBill[]
+  planned      PlannedTransaction[]
   snapshots    MonthlySnapshot[]
   settings     Settings?
   imports      ImportBatch[]
@@ -53,6 +54,7 @@ model FinAccount {
   createdAt DateTime    @default(now())
 
   transactions Transaction[]
+  planned      PlannedTransaction[]
 }
 
 enum DebtStatus {
@@ -103,7 +105,7 @@ model DebtPayment {
   status        PaymentStatus @default(PAID)
   transactionId String?
 
-  @@unique([debtId, month])
+  @@index([debtId, month])
 }
 
 // manual correction of remaining balance: positive = debt grew, negative = shrank
@@ -132,6 +134,7 @@ model Category {
 
   transactions Transaction[]
   bills        RecurringBill[]
+  planned      PlannedTransaction[]
 
   @@unique([userId, name, type])
 }
@@ -152,8 +155,11 @@ model Transaction {
   date       DateTime   @default(now())
   amount     BigInt
   direction  Direction
-  note       String     @default("")
+  note         String    @default("")
+  plannedId    String?
+  plannedMonth DateTime? @db.Date
 
+  @@unique([plannedId, plannedMonth])
   @@index([userId, date])
 }
 
@@ -167,6 +173,22 @@ model RecurringBill {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   active     Boolean   @default(true)
+}
+
+model PlannedTransaction {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  amount     BigInt
+  direction  Direction
+  dayOfMonth Int         @default(1)
+  accountId  String?
+  account    FinAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  categoryId String?
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
 }
 
 model MonthlySnapshot {
@@ -188,16 +210,16 @@ model ExchangeRate {
 }
 
 model Settings {
-  userId        String @id
-  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currency      String @default("IDR")
-  monthlyIncome BigInt @default(0)
-  livingRent    BigInt @default(0)
-  livingFood    BigInt @default(0)
-  livingFamily  BigInt @default(0)
-  livingOther   BigInt @default(0)
+  userId          String @id
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency        String @default("IDR")
+  monthlyIncome   BigInt @default(0)
+  livingRent      BigInt @default(0)
+  livingFood      BigInt @default(0)
+  livingFamily    BigInt @default(0)
+  livingOther     BigInt @default(0)
   // long-term projection assumptions (percent per year)
-  salaryGrowthPct Float @default(5)
-  inflationPct    Float @default(3)
-  savingsRatePct  Float @default(2)
+  salaryGrowthPct Float  @default(5)
+  inflationPct    Float  @default(3)
+  savingsRatePct  Float  @default(2)
 }

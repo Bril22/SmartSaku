@@ -5,8 +5,10 @@ import { requireUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
-import { payDebtMonth } from "@/app/actions";
+import { recordPlanned } from "@/app/actions";
 import CategoryPie from "@/components/CategoryPie";
+import PayForm from "@/components/PayForm";
+import Popover from "@/components/Popover";
 
 export default async function HomePage() {
   const userId = await requireUserId();
@@ -24,9 +26,16 @@ export default async function HomePage() {
       where: { userId, date: { gte: now, lt: nextMonth } },
       include: { category: true },
     }),
-    prisma.recurringBill.findMany({ where: { userId, active: true } }),
+    prisma.plannedTransaction.findMany({
+      where: { userId, active: true, direction: "OUT" },
+      orderBy: { dayOfMonth: "asc" },
+    }),
     getMoney(userId),
   ]);
+  const recordedPlannedIds = new Set(
+    monthTx.filter((t) => t.plannedId).map((t) => t.plannedId as string),
+  );
+  const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));
 
   const totalSavings = accounts.reduce((a, x) => a + Number(x.balance), 0);
   const totalDebt = debts.reduce((a, d) => a + d.remaining, 0);
@@ -42,7 +51,6 @@ export default async function HomePage() {
     (a, d) => (d.remaining > 0 && d.finishMonth && (!a || d.finishMonth > a) ? d.finishMonth : a),
     null,
   );
-  const defaultAccount = accounts[0];
 
   const spendGroups = new Map<string, { name: string; icon: string; value: number }>();
   for (const t of monthTx) {
@@ -180,34 +188,60 @@ export default async function HomePage() {
               </Link>
               <span className="text-[11.5px] text-inksoft">{monthLabel(now)} installment</span>
             </div>
-            <div className="font-extrabold text-[13px] money whitespace-nowrap">{money.rpShort(d.thisMonthPlanned)}</div>
+            <div className="font-extrabold text-[13px] money whitespace-nowrap">
+              {d.thisMonthStatus === "PARTIAL"
+                ? money.rpShort(d.thisMonthPlanned - d.thisMonthPaid) + " left"
+                : money.rpShort(d.thisMonthPlanned)}
+            </div>
             {d.thisMonthStatus === "PAID" ? (
               <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">Paid</span>
             ) : (
-              <form action={payDebtMonth}>
-                <input type="hidden" name="debtId" value={d.id} />
-                <input type="hidden" name="month" value={now.toISOString()} />
-                <input type="hidden" name="amount" value={d.thisMonthPlanned} />
-                {defaultAccount && <input type="hidden" name="accountId" value={defaultAccount.id} />}
-                <input type="hidden" name="backTo" value="/" />
-                <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-3 py-1.5">
-                  Pay ✓
-                </button>
-              </form>
+              <Popover
+                trigger={d.thisMonthStatus === "PARTIAL" ? "Pay more" : "Pay ▾"}
+                triggerClass="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                width="w-64"
+              >
+                <PayForm
+                  debtId={d.id}
+                  monthIso={now.toISOString()}
+                  dueLeft={d.thisMonthPlanned - d.thisMonthPaid}
+                  accounts={accountOptions}
+                  backTo="/"
+                />
+              </Popover>
             )}
           </div>
         ))}
 
-        {bills.map((b) => (
-          <div key={b.id} className="bg-card border border-line rounded-md p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[11px] bg-warnbg flex items-center justify-center text-base shrink-0">🧾</div>
-            <div className="flex-1 min-w-0">
-              <span className="font-bold text-[13.5px] block truncate">{b.name}</span>
-              <span className="text-[11.5px] text-inksoft">due day {b.dueDay}</span>
+        {bills.map((b) => {
+          const recorded = recordedPlannedIds.has(b.id);
+          return (
+            <div key={b.id} className="bg-card border border-line rounded-md p-3 flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-[11px] flex items-center justify-center text-base shrink-0"
+                style={{ background: recorded ? "#E9EFD8" : "#F7ECD4" }}
+              >
+                🧾
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-[13.5px] block truncate">{b.name}</span>
+                <span className="text-[11.5px] text-inksoft">planned · day {b.dayOfMonth}</span>
+              </div>
+              <div className="font-extrabold text-[13px] money whitespace-nowrap">{money.rpShort(Number(b.amount))}</div>
+              {recorded ? (
+                <span className="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5">Paid</span>
+              ) : (
+                <form action={recordPlanned}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <input type="hidden" name="backTo" value="/?home=1" />
+                  <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-3 py-1.5">
+                    Record ✓
+                  </button>
+                </form>
+              )}
             </div>
-            <div className="font-extrabold text-[13px] money whitespace-nowrap">{money.rpShort(Number(b.amount))}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       </div>

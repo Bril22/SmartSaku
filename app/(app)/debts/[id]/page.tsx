@@ -10,12 +10,12 @@ import {
   deleteDebtAdjustment,
   deleteDebtPayment,
   deleteScheduleEntry,
-  payDebtMonth,
   renameDebt,
   updateDebtPayment,
   updateScheduleEntry,
 } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
+import PayForm from "@/components/PayForm";
 import Popover from "@/components/Popover";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,14 +39,19 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
     }),
     getMoney(userId),
   ]);
-  const defaultAccount = accounts[0];
 
   const totalPlanned = debt.schedule.reduce((a, s) => a + Number(s.planned), 0);
   const totalPaid = debt.payments.reduce((a, p) => a + Number(p.amount), 0);
   const adj = debt.adjustments.reduce((a, x) => a + Number(x.delta), 0);
   const remaining = Math.max(0, totalPlanned + adj - totalPaid);
-  const payByMonth = new Map(debt.payments.map((p) => [p.month.getTime(), p]));
+  const payByMonth = new Map<number, typeof debt.payments>();
+  for (const p of debt.payments) {
+    const key = p.month.getTime();
+    if (!payByMonth.has(key)) payByMonth.set(key, []);
+    payByMonth.get(key)!.push(p);
+  }
   const upcoming = debt.schedule.filter((s) => Number(s.planned) > 0);
+  const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));
 
   return (
     <div>
@@ -97,8 +102,12 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
       <h2 className="text-sm font-bold mb-2">Payment schedule</h2>
       <div className="space-y-1.5 mb-6">
         {upcoming.map((s) => {
-          const p = payByMonth.get(s.month.getTime());
-          const isPast = s.month < now;
+          const monthPayments = payByMonth.get(s.month.getTime()) ?? [];
+          const paidSum = monthPayments.reduce((a, p) => a + Number(p.amount), 0);
+          const planned = Number(s.planned);
+          const dueLeft = Math.max(0, planned - paidSum);
+          const fullyPaid = paidSum >= planned && paidSum > 0;
+          const partial = paidSum > 0 && !fullyPaid;
           const isCurrent = s.month.getTime() === now.getTime();
           return (
             <div
@@ -109,9 +118,10 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
             >
               <div className="flex-1">
                 <div className="font-semibold text-[13px]">{monthLabel(s.month)}</div>
-                {p && (
+                {paidSum > 0 && (
                   <div className="text-[11px] text-inksoft">
-                    paid {money.rp(Number(p.amount))} on {p.paidDate.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                    paid {money.rp(paidSum)}
+                    {partial && <b className="text-peachdeep"> · {money.rpShort(dueLeft)} left</b>}
                   </div>
                 )}
               </div>
@@ -141,62 +151,70 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                   </button>
                 </form>
               </Popover>
-              {p ? (
+              {paidSum > 0 && (
                 <Popover
-                  trigger="Paid ▾"
-                  triggerClass="bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                  trigger={fullyPaid ? "Paid ▾" : "Partial ▾"}
+                  triggerClass={
+                    fullyPaid
+                      ? "bg-goodbg text-good rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                      : "bg-warnbg text-warn rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                  }
+                  width="w-64"
                 >
                   <div className="text-[10.5px] font-bold text-inksoft uppercase tracking-wide">
-                    Status
+                    {fullyPaid ? "✓ Fully paid" : `Partial — ${money.rpShort(dueLeft)} left`}
                   </div>
-                  <div className="flex items-center gap-2 text-[12.5px] font-bold text-good">
-                    ✓ Paid
-                  </div>
-                  <form action={updateDebtPayment} className="space-y-2">
-                    <input type="hidden" name="paymentId" value={p.id} />
-                    <label className="block text-[10.5px] font-bold text-inksoft">Paid amount</label>
-                    <MoneyInput
-                      name="amount"
-                      required
-                      defaultValue={Number(p.amount)}
-                      className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
-                    />
-                    <button className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2">
-                      Update payment
-                    </button>
-                  </form>
-                  <form action={deleteDebtPayment}>
-                    <input type="hidden" name="paymentId" value={p.id} />
-                    <button className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2">
-                      Mark as unpaid
-                    </button>
-                  </form>
+                  {monthPayments.map((p, i) => (
+                    <div key={p.id} className="border-t border-line pt-2 space-y-2">
+                      <div className="text-[10.5px] text-inksoft">
+                        Payment {i + 1} ·{" "}
+                        {p.paidDate.toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                      </div>
+                      <form action={updateDebtPayment} className="flex gap-1.5">
+                        <input type="hidden" name="paymentId" value={p.id} />
+                        <div className="flex-1">
+                          <MoneyInput
+                            name="amount"
+                            required
+                            defaultValue={Number(p.amount)}
+                            className="w-full rounded-md border border-line bg-cream2 px-2.5 py-1.5 text-xs text-right money"
+                          />
+                        </div>
+                        <button className="bg-sagedeep text-cream2 rounded-full text-[10.5px] font-extrabold px-3">
+                          Save
+                        </button>
+                      </form>
+                      <form action={deleteDebtPayment}>
+                        <input type="hidden" name="paymentId" value={p.id} />
+                        <button className="w-full border border-bad text-bad rounded-full text-[10.5px] font-extrabold py-1.5">
+                          Undo this payment
+                        </button>
+                      </form>
+                    </div>
+                  ))}
                   <p className="text-[10px] text-inksoft">
-                    Unpaid returns the money to your account and reopens this month.
+                    Undo returns the money to its account and reopens the amount.
                   </p>
                 </Popover>
-              ) : isPast || isCurrent ? (
-                <form action={payDebtMonth}>
-                  <input type="hidden" name="debtId" value={debt.id} />
-                  <input type="hidden" name="month" value={s.month.toISOString()} />
-                  <input type="hidden" name="amount" value={Number(s.planned)} />
-                  {defaultAccount && <input type="hidden" name="accountId" value={defaultAccount.id} />}
-                  <input type="hidden" name="backTo" value={`/debts/${debt.id}`} />
-                  <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-3 py-1.5">
-                    Pay ✓
-                  </button>
-                </form>
-              ) : (
-                <form action={payDebtMonth}>
-                  <input type="hidden" name="debtId" value={debt.id} />
-                  <input type="hidden" name="month" value={s.month.toISOString()} />
-                  <input type="hidden" name="amount" value={Number(s.planned)} />
-                  {defaultAccount && <input type="hidden" name="accountId" value={defaultAccount.id} />}
-                  <input type="hidden" name="backTo" value={`/debts/${debt.id}`} />
-                  <button className="border border-line text-inksoft rounded-full text-[11px] font-bold px-3 py-1.5 hover:border-sagedeep hover:text-sagedeep">
-                    Pay early
-                  </button>
-                </form>
+              )}
+              {dueLeft > 0 && (
+                <Popover
+                  trigger={paidSum > 0 ? "Pay more" : isCurrent || s.month < now ? "Pay ✓" : "Pay early"}
+                  triggerClass={
+                    paidSum > 0 || isCurrent || s.month < now
+                      ? "bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-3 py-1.5"
+                      : "border border-line text-inksoft rounded-full text-[11px] font-bold px-3 py-1.5 hover:border-sagedeep hover:text-sagedeep"
+                  }
+                  width="w-64"
+                >
+                  <PayForm
+                    debtId={debt.id}
+                    monthIso={s.month.toISOString()}
+                    dueLeft={dueLeft}
+                    accounts={accountOptions}
+                    backTo={`/debts/${debt.id}`}
+                  />
+                </Popover>
               )}
             </div>
           );

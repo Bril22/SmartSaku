@@ -182,7 +182,7 @@ export async function payDebtMonth(formData: FormData) {
   const userId = await requireUser();
   const debtId = String(formData.get("debtId") ?? "");
   const monthIso = String(formData.get("month") ?? "");
-  const amount = Math.round(Number(formData.get("amount") ?? 0));
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
   const accountId = String(formData.get("accountId") ?? "") || null;
   const backTo = String(formData.get("backTo") ?? "/");
 
@@ -190,41 +190,69 @@ export async function payDebtMonth(formData: FormData) {
   if (!debt || !monthIso || amount <= 0) redirect(backTo);
   const month = new Date(monthIso);
 
-  const account = accountId
-    ? await prisma.finAccount.findFirst({ where: { id: accountId, userId } })
-    : null;
-  const debtCategory = account
-    ? await prisma.category.upsert({
-        where: { userId_name_type: { userId, name: "Debt", type: "EXPENSE" } },
-        create: { userId, name: "Debt", type: "EXPENSE", icon: "🏦" },
-        update: {},
-      })
-    : null;
+  const account = await prisma.finAccount.findFirst({
+    where: { id: accountId ?? "", userId, archived: false },
+  });
+  if (!account) {
+    redirect(`${backTo}?err=` + encodeURIComponent("Choose which account to pay from"));
+  }
+  const debtCategory = await prisma.category.upsert({
+    where: { userId_name_type: { userId, name: "Debt", type: "EXPENSE" } },
+    create: { userId, name: "Debt", type: "EXPENSE", icon: "🏦" },
+    update: {},
+  });
+
+  let monthFullyPaid = false;
+  let paidNothing = false;
   await prisma.$transaction(async (tx) => {
-    let transactionId: string | null = null;
-    if (account) {
-      const created = await tx.transaction.create({
-        data: {
-          userId,
-          accountId: account.id,
-          categoryId: debtCategory?.id,
-          amount: BigInt(amount),
-          direction: "OUT",
-          note: `Debt payment — ${debt.lender}`,
-        },
-      });
-      transactionId = created.id;
-      await tx.finAccount.update({
-        where: { id: account.id },
-        data: { balance: { decrement: BigInt(amount) } },
-      });
+    const [entry, monthPaidAgg, totalPlannedAgg, totalPaidAgg, adjAgg] = await Promise.all([
+      tx.debtScheduleEntry.findFirst({ where: { debtId, month } }),
+      tx.debtPayment.aggregate({ where: { debtId, month }, _sum: { amount: true } }),
+      tx.debtScheduleEntry.aggregate({ where: { debtId }, _sum: { planned: true } }),
+      tx.debtPayment.aggregate({ where: { debtId }, _sum: { amount: true } }),
+      tx.debtAdjustment.aggregate({ where: { debtId }, _sum: { delta: true } }),
+    ]);
+    const planned = Number(entry?.planned ?? 0n);
+    const alreadyPaid = Number(monthPaidAgg._sum.amount ?? 0n);
+    const totalRemaining =
+      Number(totalPlannedAgg._sum.planned ?? 0n) +
+      Number(adjAgg._sum.delta ?? 0n) -
+      Number(totalPaidAgg._sum.amount ?? 0n);
+    const dueLeft = Math.min(planned - alreadyPaid, totalRemaining);
+    if (dueLeft <= 0) {
+      paidNothing = true;
+      return;
     }
-    await tx.debtPayment.upsert({
-      where: { debtId_month: { debtId, month } },
-      create: { debtId, month, amount: BigInt(amount), status: "PAID", transactionId },
-      update: { amount: BigInt(amount), status: "PAID", paidDate: new Date(), transactionId },
+    const payAmount = Math.min(amount, dueLeft);
+    monthFullyPaid = alreadyPaid + payAmount >= planned;
+
+    const created = await tx.transaction.create({
+      data: {
+        userId,
+        accountId: account!.id,
+        categoryId: debtCategory.id,
+        amount: BigInt(payAmount),
+        direction: "OUT",
+        note: `Debt payment — ${debt.lender}`,
+      },
+    });
+    await tx.finAccount.update({
+      where: { id: account!.id },
+      data: { balance: { decrement: BigInt(payAmount) } },
+    });
+    await tx.debtPayment.create({
+      data: {
+        debtId,
+        month,
+        amount: BigInt(payAmount),
+        status: monthFullyPaid ? "PAID" : "PARTIAL",
+        transactionId: created.id,
+      },
     });
   });
+  if (paidNothing) {
+    redirect(`${backTo}?err=` + encodeURIComponent("This month is already fully paid"));
+  }
 
   // detect full payoff for the big celebration
   const [schedule, payments, adjustments] = await Promise.all([
@@ -244,7 +272,11 @@ export async function payDebtMonth(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/debts");
   revalidatePath(`/debts/${debtId}`);
-  const msg = lunas ? `${debt.lender} is fully paid — LUNAS! 🎉` : `${debt.lender} payment recorded ✓`;
+  const msg = lunas
+    ? `${debt.lender} is fully paid — LUNAS! 🎉`
+    : monthFullyPaid
+      ? `${debt.lender} payment recorded ✓`
+      : `Partial payment recorded — ${debt.lender} still needs more this month`;
   redirect(`${backTo}?ok=${encodeURIComponent(msg)}&fx=${lunas ? "lunas" : "paid"}`);
 }
 
@@ -393,18 +425,33 @@ export async function updateDebtPayment(formData: FormData) {
   const userId = await requireUser();
   const paymentId = String(formData.get("paymentId") ?? "");
   const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
-  const payment = await prisma.debtPayment.findFirst({
+  const owned = await prisma.debtPayment.findFirst({
     where: { id: paymentId, debt: { userId } },
-    include: { debt: true },
   });
-  if (!payment || !amount) redirect("/money?tab=debts");
-  const backTo = `/debts/${payment!.debtId}`;
-  const diff = BigInt(amount) - payment!.amount;
+  if (!owned || !amount) redirect("/money?tab=debts");
+  const backTo = `/debts/${owned!.debtId}`;
 
+  let overCap = 0;
   await prisma.$transaction(async (tx) => {
+    const payment = await tx.debtPayment.findUnique({ where: { id: paymentId } });
+    if (!payment) return;
+    const [entry, othersAgg] = await Promise.all([
+      tx.debtScheduleEntry.findFirst({ where: { debtId: payment.debtId, month: payment.month } }),
+      tx.debtPayment.aggregate({
+        where: { debtId: payment.debtId, month: payment.month, NOT: { id: paymentId } },
+        _sum: { amount: true },
+      }),
+    ]);
+    const planned = Number(entry?.planned ?? 0n);
+    const others = Number(othersAgg._sum.amount ?? 0n);
+    if (planned > 0 && amount + others > planned) {
+      overCap = planned - others;
+      return;
+    }
+    const diff = BigInt(amount) - payment.amount;
     await tx.debtPayment.update({ where: { id: paymentId }, data: { amount: BigInt(amount) } });
-    if (payment!.transactionId) {
-      const linked = await tx.transaction.findUnique({ where: { id: payment!.transactionId } });
+    if (payment.transactionId) {
+      const linked = await tx.transaction.findUnique({ where: { id: payment.transactionId } });
       if (linked) {
         await tx.transaction.update({
           where: { id: linked.id },
@@ -417,6 +464,14 @@ export async function updateDebtPayment(formData: FormData) {
       }
     }
   });
+  if (overCap > 0) {
+    redirect(
+      `${backTo}?err=` +
+        encodeURIComponent(
+          `Too much — other payments already cover part of this month (max ${overCap.toLocaleString("en-US")})`,
+        ),
+    );
+  }
   revalidatePath("/", "layout");
   redirect(`${backTo}?ok=` + encodeURIComponent("Payment updated — balances synced"));
 }
@@ -459,6 +514,126 @@ export async function deleteDebtAdjustment(formData: FormData) {
   await prisma.debtAdjustment.delete({ where: { id } });
   revalidatePath("/", "layout");
   redirect(`/debts/${adj!.debtId}?ok=` + encodeURIComponent("Adjustment removed"));
+}
+
+/* ---------- transaction plan ---------- */
+
+export async function addPlanned(formData: FormData) {
+  const userId = await requireUser();
+  const name = String(formData.get("name") ?? "").trim();
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
+  const dayOfMonth = Math.min(28, Math.max(1, Math.round(Number(formData.get("dayOfMonth") ?? 1))));
+  const accountId = String(formData.get("accountId") ?? "") || null;
+  const categoryId = String(formData.get("categoryId") ?? "") || null;
+  if (!name || !amount) {
+    redirect("/money?tab=plan&err=" + encodeURIComponent("Please fill the name and amount"));
+  }
+  if (accountId) {
+    const owns = await prisma.finAccount.count({ where: { id: accountId, userId } });
+    if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown account"));
+  }
+  if (categoryId) {
+    const owns = await prisma.category.count({ where: { id: categoryId, userId } });
+    if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown category"));
+  }
+  await prisma.plannedTransaction.create({
+    data: { userId, name, amount: BigInt(amount), direction, dayOfMonth, accountId, categoryId },
+  });
+  revalidatePath("/", "layout");
+  redirect("/money?tab=plan&ok=" + encodeURIComponent(`"${name}" added to your plan`));
+}
+
+export async function updatePlanned(formData: FormData) {
+  const userId = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const dayOfMonth = Math.min(28, Math.max(1, Math.round(Number(formData.get("dayOfMonth") ?? 1))));
+  const accountId = String(formData.get("accountId") ?? "") || null;
+  const categoryId = String(formData.get("categoryId") ?? "") || null;
+  const planned = await prisma.plannedTransaction.findFirst({ where: { id, userId } });
+  if (!planned || !name || !amount) {
+    redirect("/money?tab=plan&err=" + encodeURIComponent("Could not update the plan item"));
+  }
+  if (accountId) {
+    const owns = await prisma.finAccount.count({ where: { id: accountId, userId } });
+    if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown account"));
+  }
+  if (categoryId) {
+    const owns = await prisma.category.count({ where: { id: categoryId, userId } });
+    if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown category"));
+  }
+  await prisma.plannedTransaction.update({
+    where: { id },
+    data: { name, amount: BigInt(amount), dayOfMonth, accountId, categoryId },
+  });
+  revalidatePath("/", "layout");
+  redirect("/money?tab=plan&ok=" + encodeURIComponent("Plan updated"));
+}
+
+export async function deletePlanned(formData: FormData) {
+  const userId = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  await prisma.plannedTransaction.deleteMany({ where: { id, userId } });
+  revalidatePath("/", "layout");
+  redirect("/money?tab=plan&ok=" + encodeURIComponent("Removed from your plan"));
+}
+
+export async function recordPlanned(formData: FormData) {
+  const userId = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const backTo = String(formData.get("backTo") ?? "/money?tab=plan");
+  const planned = await prisma.plannedTransaction.findFirst({ where: { id, userId } });
+  if (!planned) redirect(backTo);
+
+  const now = monthKey();
+
+  let accountId = planned!.accountId;
+  if (accountId) {
+    const owns = await prisma.finAccount.count({ where: { id: accountId, userId, archived: false } });
+    if (owns === 0) accountId = null;
+  }
+  if (!accountId) {
+    const first = await prisma.finAccount.findFirst({
+      where: { userId, archived: false },
+      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+    });
+    if (!first) redirect(`${backTo}&err=` + encodeURIComponent("Create an account first"));
+    accountId = first!.id;
+  }
+
+  const effect = planned!.direction === "IN" ? planned!.amount : -planned!.amount;
+  try {
+    await prisma.$transaction([
+      prisma.transaction.create({
+        data: {
+          userId,
+          accountId,
+          categoryId: planned!.categoryId,
+          amount: planned!.amount,
+          direction: planned!.direction,
+          note: planned!.name,
+          plannedId: id,
+          plannedMonth: now,
+        },
+      }),
+      prisma.finAccount.update({
+        where: { id: accountId },
+        data: { balance: { increment: effect } },
+      }),
+    ]);
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") {
+      redirect(`${backTo}&err=` + encodeURIComponent(`"${planned!.name}" is already recorded this month`));
+    }
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  if (planned!.direction === "IN") {
+    redirect(`${backTo}&ok=` + encodeURIComponent(`"${planned!.name}" recorded 💰`) + "&fx=money");
+  }
+  redirect(`${backTo}&ok=` + encodeURIComponent(`"${planned!.name}" recorded ✓`));
 }
 
 /* ---------- settings ---------- */

@@ -11,6 +11,7 @@ export type DebtSummary = {
   remaining: number;
   finishMonth: Date | null;
   thisMonthPlanned: number;
+  thisMonthPaid: number;
   thisMonthStatus: "PAID" | "PARTIAL" | "SKIPPED" | "DUE" | "NONE";
   progressPct: number;
 };
@@ -43,7 +44,10 @@ export async function getDebtSummaries(userId: string): Promise<DebtSummary[]> {
   const paidBy = new Map(paid.map((p) => [p.debtId, Number(p._sum.amount ?? 0n)]));
   const adjBy = new Map(adjusted.map((a) => [a.debtId, Number(a._sum.delta ?? 0n)]));
   const entryBy = new Map(thisMonthEntries.map((e) => [e.debtId, Number(e.planned)]));
-  const paymentBy = new Map(thisMonthPayments.map((p) => [p.debtId, p]));
+  const paymentSumBy = new Map<string, number>();
+  for (const p of thisMonthPayments) {
+    paymentSumBy.set(p.debtId, (paymentSumBy.get(p.debtId) ?? 0) + Number(p.amount));
+  }
 
   return debts.map((d) => {
     const totalPlanned = Number(plannedBy.get(d.id)?._sum.planned ?? 0n);
@@ -52,12 +56,15 @@ export async function getDebtSummaries(userId: string): Promise<DebtSummary[]> {
     const remaining = Math.max(0, totalPlanned + adjustments - totalPaid);
     const finishMonth = plannedBy.get(d.id)?._max.month ?? null;
     const thisMonthPlanned = entryBy.get(d.id) ?? 0;
-    const thisPayment = paymentBy.get(d.id);
-    const thisMonthStatus = thisPayment
-      ? thisPayment.status
-      : thisMonthPlanned > 0
-        ? "DUE"
-        : "NONE";
+    const thisMonthPaid = paymentSumBy.get(d.id) ?? 0;
+    const thisMonthStatus =
+      thisMonthPlanned > 0 && thisMonthPaid >= thisMonthPlanned
+        ? "PAID"
+        : thisMonthPaid > 0
+          ? "PARTIAL"
+          : thisMonthPlanned > 0
+            ? "DUE"
+            : "NONE";
     const denom = totalPlanned + adjustments;
     const progressPct = denom > 0 ? Math.min(100, Math.round((totalPaid / denom) * 100)) : 100;
     return {
@@ -70,6 +77,7 @@ export async function getDebtSummaries(userId: string): Promise<DebtSummary[]> {
       remaining,
       finishMonth,
       thisMonthPlanned,
+      thisMonthPaid,
       thisMonthStatus,
       progressPct,
     };
@@ -89,17 +97,25 @@ export type ProjectionPoint = {
  * yearly, living costs inflate yearly, savings earn interest monthly.
  */
 export async function projectFuture(userId: string, years: number): Promise<ProjectionPoint[]> {
-  const [settings, accounts, debts] = await Promise.all([
+  const [settings, accounts, debts, plannedItems] = await Promise.all([
     prisma.settings.findUnique({ where: { userId } }),
     prisma.finAccount.findMany({ where: { userId } }),
     prisma.debt.findMany({ where: { userId }, include: { schedule: true, payments: true, adjustments: true } }),
+    prisma.plannedTransaction.findMany({ where: { userId, active: true } }),
   ]);
-  const income0 = Number(settings?.monthlyIncome ?? 0);
-  const living0 =
+  const plannedIn = plannedItems
+    .filter((p) => p.direction === "IN")
+    .reduce((a, p) => a + Number(p.amount), 0);
+  const plannedOut = plannedItems
+    .filter((p) => p.direction === "OUT")
+    .reduce((a, p) => a + Number(p.amount), 0);
+  const income0 = plannedIn > 0 ? plannedIn : Number(settings?.monthlyIncome ?? 0);
+  const settingsLiving =
     Number(settings?.livingRent ?? 0) +
     Number(settings?.livingFood ?? 0) +
     Number(settings?.livingFamily ?? 0) +
     Number(settings?.livingOther ?? 0);
+  const living0 = plannedOut > 0 ? plannedOut : settingsLiving;
   const growth = (settings?.salaryGrowthPct ?? 0) / 100;
   const inflation = (settings?.inflationPct ?? 0) / 100;
   const savingsRateMonthly = (settings?.savingsRatePct ?? 0) / 100 / 12;
@@ -107,6 +123,18 @@ export async function projectFuture(userId: string, years: number): Promise<Proj
   let savings = accounts.reduce((a, x) => a + Number(x.balance), 0);
   const start = monthKey();
   const months = years * 12;
+
+  // planned items already recorded this month are in the balances — don't count them twice
+  const startNext = addMonths(start, 1);
+  const recordedThisMonth = await prisma.transaction.findMany({
+    where: { userId, plannedId: { not: null }, date: { gte: start, lt: startNext } },
+  });
+  const recordedIn = recordedThisMonth
+    .filter((t) => t.direction === "IN")
+    .reduce((a, t) => a + Number(t.amount), 0);
+  const recordedOut = recordedThisMonth
+    .filter((t) => t.direction === "OUT")
+    .reduce((a, t) => a + Number(t.amount), 0);
 
   // future planned payment per month key, plus remaining totals for scaling
   const points: ProjectionPoint[] = [];
@@ -132,8 +160,12 @@ export async function projectFuture(userId: string, years: number): Promise<Proj
   for (let i = 0; i < months; i++) {
     const m = addMonths(start, i);
     const yearIdx = Math.floor(i / 12);
-    const income = income0 * Math.pow(1 + growth, yearIdx);
-    const living = living0 * Math.pow(1 + inflation, yearIdx);
+    let income = income0 * Math.pow(1 + growth, yearIdx);
+    let living = living0 * Math.pow(1 + inflation, yearIdx);
+    if (i === 0) {
+      income = Math.max(0, income - recordedIn);
+      living = Math.max(0, living - recordedOut);
+    }
     let debtPay = 0;
     let debtRemaining = 0;
     for (const ds of debtStates) {
