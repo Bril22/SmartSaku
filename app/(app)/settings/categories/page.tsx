@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserId } from "@/lib/auth";
 import { addCategory, deleteCategory, updateCategory } from "@/app/settings/actions";
+import MoneyInput from "@/components/MoneyInput";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function ManageCategoriesPage() {
@@ -29,23 +30,40 @@ export default async function ManageCategoriesPage() {
           <div className="space-y-2">
             {(list as typeof categories).map((c) => (
               <div key={c.id} className="bg-card border border-line rounded-lg px-3.5 py-3">
-                <form action={updateCategory} className="flex items-center gap-2.5">
-                  <input type="hidden" name="id" value={c.id} />
-                  <input
-                    name="icon"
-                    defaultValue={c.icon}
-                    maxLength={8}
-                    className="w-10 text-center text-lg bg-cream2 rounded-md border border-line py-1"
-                  />
-                  <input
-                    name="name"
-                    defaultValue={c.name}
-                    maxLength={30}
-                    className="flex-1 font-semibold text-[13.5px] bg-transparent border-b border-transparent focus:border-line focus:outline-none min-w-0"
-                  />
-                  <SubmitButton className="text-[11px] font-extrabold text-sagedeep" pendingText="…">
-                    Save
-                  </SubmitButton>
+                <form action={updateCategory} className="space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <input type="hidden" name="id" value={c.id} />
+                    <input
+                      name="icon"
+                      defaultValue={c.icon}
+                      maxLength={8}
+                      className="w-10 text-center text-lg bg-cream2 rounded-md border border-line py-1"
+                    />
+                    <input
+                      name="name"
+                      defaultValue={c.name}
+                      maxLength={30}
+                      className="flex-1 font-semibold text-[13.5px] bg-transparent border-b border-transparent focus:border-line focus:outline-none min-w-0"
+                    />
+                    <SubmitButton className="text-[11px] font-extrabold text-sagedeep" pendingText="…">
+                      Save
+                    </SubmitButton>
+                  </div>
+                  {type === "EXPENSE" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10.5px] font-bold text-inksoft shrink-0">
+                        Monthly budget
+                      </span>
+                      <div className="flex-1">
+                        <MoneyInput
+                          name="budget"
+                          defaultValue={Number(c.budget)}
+                          placeholder="no limit"
+                          className="w-full rounded-md border border-line bg-cream2 px-2.5 py-1.5 text-xs text-right money"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </form>
                 <form action={deleteCategory} className="text-right mt-1">
                   <input type="hidden" name="id" value={c.id} />

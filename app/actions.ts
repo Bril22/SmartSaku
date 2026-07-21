@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
@@ -119,6 +120,63 @@ export async function updateAccountBalance(formData: FormData) {
   redirect("/money?ok=" + encodeURIComponent("Balance updated"));
 }
 
+export async function transferBetweenAccounts(formData: FormData) {
+  const userId = await requireUser();
+  const fromId = String(formData.get("fromAccountId") ?? "");
+  const toId = String(formData.get("toAccountId") ?? "");
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const note = String(formData.get("note") ?? "").trim();
+  const back = "/money/transfer";
+
+  if (!amount) redirect(`${back}?err=` + encodeURIComponent("Please fill the amount"));
+  if (fromId === toId) {
+    redirect(`${back}?err=` + encodeURIComponent("Choose two different accounts"));
+  }
+  const [from, to] = await Promise.all([
+    prisma.finAccount.findFirst({ where: { id: fromId, userId, archived: false } }),
+    prisma.finAccount.findFirst({ where: { id: toId, userId, archived: false } }),
+  ]);
+  if (!from || !to) redirect(`${back}?err=` + encodeURIComponent("Choose both accounts"));
+
+  const transferId = randomUUID();
+  const label = note || `Transfer ${from!.name} → ${to!.name}`;
+  await prisma.$transaction([
+    prisma.transaction.create({
+      data: {
+        userId,
+        accountId: from!.id,
+        amount: BigInt(amount),
+        direction: "OUT",
+        note: label,
+        transferId,
+      },
+    }),
+    prisma.transaction.create({
+      data: {
+        userId,
+        accountId: to!.id,
+        amount: BigInt(amount),
+        direction: "IN",
+        note: label,
+        transferId,
+      },
+    }),
+    prisma.finAccount.update({
+      where: { id: from!.id },
+      data: { balance: { decrement: BigInt(amount) } },
+    }),
+    prisma.finAccount.update({
+      where: { id: to!.id },
+      data: { balance: { increment: BigInt(amount) } },
+    }),
+  ]);
+  revalidatePath("/", "layout");
+  redirect(
+    "/money?tab=history&ok=" +
+      encodeURIComponent(`Moved money from ${from!.name} to ${to!.name} ⇄`),
+  );
+}
+
 export async function updateTransaction(formData: FormData) {
   const userId = await requireUser();
   const id = String(formData.get("id") ?? "");
@@ -171,6 +229,25 @@ export async function deleteTransaction(formData: FormData) {
   const backTo = String(formData.get("backTo") ?? "/money?tab=history");
   const old = await prisma.transaction.findFirst({ where: { id, userId } });
   if (!old) redirect(`${backTo}&err=` + encodeURIComponent("Transaction not found"));
+  if (old!.transferId) {
+    const legs = await prisma.transaction.findMany({
+      where: { userId, transferId: old!.transferId },
+    });
+    await prisma.$transaction(async (tx) => {
+      for (const leg of legs) {
+        await tx.finAccount.update({
+          where: { id: leg.accountId },
+          data: {
+            balance: { [leg.direction === "IN" ? "decrement" : "increment"]: leg.amount },
+          },
+        });
+      }
+      await tx.transaction.deleteMany({ where: { userId, transferId: old!.transferId } });
+    });
+    revalidatePath("/", "layout");
+    redirect(`${backTo}&ok=` + encodeURIComponent("Transfer undone on both accounts"));
+  }
+
   const effect = old!.direction === "IN" ? old!.amount : -old!.amount;
   const [linkedPayment, linkedContribution] = await Promise.all([
     prisma.debtPayment.findFirst({ where: { transactionId: id }, include: { debt: true } }),

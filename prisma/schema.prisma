@@ -132,6 +132,7 @@ model Category {
   name   String
   type   CategoryType
   icon   String       @default("💸")
+  budget BigInt       @default(0)
 
   transactions Transaction[]
   bills        RecurringBill[]
@@ -160,6 +161,7 @@ model Transaction {
   plannedId     String?
   plannedMonth  DateTime?  @db.Date
   importBatchId String?
+  transferId    String?
 
   @@unique([plannedId, plannedMonth])
   @@index([userId, date])

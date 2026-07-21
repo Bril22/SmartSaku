@@ -62,6 +62,16 @@ export default async function HomePage() {
   }
   const spendPie = [...spendGroups.values()].sort((a, b) => b.value - a.value);
 
+  const budgeted = await prisma.category.findMany({
+    where: { userId, type: "EXPENSE", budget: { gt: 0 } },
+    orderBy: { name: "asc" },
+  });
+  const spentByCategory = new Map<string, number>();
+  for (const t of monthTx) {
+    if (t.direction !== "OUT" || !t.categoryId) continue;
+    spentByCategory.set(t.categoryId, (spentByCategory.get(t.categoryId) ?? 0) + Number(t.amount));
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
@@ -139,6 +149,48 @@ export default async function HomePage() {
           emptyText="No expenses yet this month. 🌱"
         />
       </div>
+
+      {/* budgets */}
+      {budgeted.length > 0 && (
+        <div className="bg-card border border-line rounded-lg p-4 mb-5">
+          <div className="flex items-baseline justify-between mb-2.5">
+            <h2 className="text-sm font-bold">Budgets ({monthLabel(now)})</h2>
+            <Link href="/settings/categories" className="text-xs font-bold text-sagedeep">
+              Edit
+            </Link>
+          </div>
+          <div className="space-y-2.5">
+            {budgeted.map((c) => {
+              const spent = spentByCategory.get(c.id) ?? 0;
+              const limit = Number(c.budget);
+              const pct = Math.min(100, Math.round((spent / limit) * 100));
+              const over = spent > limit;
+              return (
+                <div key={c.id}>
+                  <div className="flex items-baseline justify-between text-[12px] mb-1">
+                    <span>
+                      {c.icon} {c.name}
+                    </span>
+                    <span className={`money font-bold ${over ? "text-bad" : "text-inksoft"}`}>
+                      {money.rpShort(spent)} / {money.rpShort(limit)}
+                      {over && " ⚠"}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-cream overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${pct}%`,
+                        background: over ? "#C0563E" : pct > 80 ? "#C79A3D" : "#BBC863",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* accounts strip */}
       <div className="flex items-baseline justify-between mb-2">

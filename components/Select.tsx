@@ -5,12 +5,14 @@ import { createPortal } from "react-dom";
 
 export type SelectOption = { value: string; label: string; icon?: string };
 
-type Anchor = { top: number; left: number; width: number; openUp: boolean };
+type Anchor = { top: number; left: number; width: number };
 
 export default function Select({
   name,
   options,
   defaultValue,
+  value: controlledValue,
+  onChange,
   placeholder = "Choose…",
   required,
   label,
@@ -18,16 +20,23 @@ export default function Select({
   name: string;
   options: SelectOption[];
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   placeholder?: string;
   required?: boolean;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(defaultValue ?? "");
+  const [uncontrolled, setUncontrolled] = useState(defaultValue ?? "");
+  const value = controlledValue ?? uncontrolled;
   const [mounted, setMounted] = useState(false);
   const [isSheet, setIsSheet] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [dragY, setDragY] = useState(0);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const dragStart = useRef<number | null>(null);
+  const dragDelta = useRef(0);
   const selected = options.find((o) => o.value === value);
 
   useEffect(() => setMounted(true), []);
@@ -45,7 +54,6 @@ export default function Select({
         top: openUp ? r.top - listHeight - 6 : r.bottom + 6,
         left: Math.min(r.left, window.innerWidth - r.width - 8),
         width: r.width,
-        openUp,
       });
     };
     place();
@@ -62,50 +70,114 @@ export default function Select({
     };
   }, [open, options.length]);
 
-  const choose = (v: string) => {
-    setValue(v);
+  const close = () => {
     setOpen(false);
+    setExpanded(false);
+    setDragY(0);
+  };
+
+  const choose = (v: string) => {
+    if (controlledValue === undefined) setUncontrolled(v);
+    onChange?.(v);
+    close();
+  };
+
+  // drag the grabber: up = full screen, down = collapse or dismiss
+  const onHandleDown = (e: React.PointerEvent) => {
+    dragStart.current = e.clientY;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // pointer capture is a nicety; dragging still works without it
+    }
+  };
+  const onHandleMove = (e: React.PointerEvent) => {
+    if (dragStart.current === null) return;
+    dragDelta.current = e.clientY - dragStart.current;
+    setDragY(dragDelta.current);
+  };
+  const onHandleUp = () => {
+    const dy = dragDelta.current;
+    dragStart.current = null;
+    dragDelta.current = 0;
+    setDragY(0);
+    if (dy < -40) setExpanded(true);
+    else if (dy > 60) {
+      if (expanded) setExpanded(false);
+      else close();
+    }
+  };
+
+  const sheetStyle: React.CSSProperties = {
+    transform: dragY !== 0 ? `translateY(${Math.max(dragY, -20)}px)` : undefined,
+    transition: dragStart.current === null ? "transform .2s ease-out, max-height .25s ease-out" : "none",
   };
 
   const list = (
-    <ul
-      role="listbox"
+    <div
       className={
         isSheet
-          ? "fixed inset-x-0 bottom-0 z-[70] max-h-[65vh] overflow-y-auto overscroll-contain bg-card rounded-t-2xl pt-2 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(68,58,40,.25)]"
+          ? `fixed inset-x-0 bottom-0 z-[70] flex flex-col bg-card rounded-t-2xl shadow-[0_-8px_30px_rgba(68,58,40,.25)] ${
+              expanded ? "top-0 rounded-t-none" : "max-h-[65vh]"
+            }`
           : "fixed z-[70] max-h-[280px] overflow-y-auto overscroll-contain bg-card border border-line rounded-md py-1 shadow-[0_10px_30px_rgba(68,58,40,.22)]"
       }
       style={
-        isSheet || !anchor
-          ? undefined
-          : { top: anchor.top, left: anchor.left, width: anchor.width }
+        isSheet
+          ? sheetStyle
+          : anchor
+            ? { top: anchor.top, left: anchor.left, width: anchor.width }
+            : undefined
       }
     >
       {isSheet && (
-        <li className="px-4 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-inksoft">
-          {label ?? placeholder}
-        </li>
-      )}
-      {options.map((o) => (
-        <li
-          key={o.value}
-          role="option"
-          aria-selected={o.value === value}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            choose(o.value);
-          }}
-          className={`flex items-center gap-2.5 cursor-pointer ${
-            isSheet ? "px-4 py-3.5 text-[15px] min-h-[48px]" : "px-3.5 py-2.5 text-sm"
-          } ${o.value === value ? "font-bold text-sagedeep bg-goodbg/60" : ""}`}
+        <div
+          onPointerDown={onHandleDown}
+          onPointerMove={onHandleMove}
+          onPointerUp={onHandleUp}
+          onPointerCancel={onHandleUp}
+          className="shrink-0 pt-2.5 pb-1 cursor-grab active:cursor-grabbing touch-none"
         >
-          {o.icon && <span className="text-base leading-none">{o.icon}</span>}
-          <span className="flex-1 truncate">{o.label}</span>
-          {o.value === value && <span className="text-sagedeep">✓</span>}
-        </li>
-      ))}
-    </ul>
+          <div className="mx-auto h-1.5 w-11 rounded-full bg-line" />
+          <div className="flex items-center justify-between px-4 pt-2 pb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-inksoft">
+              {label ?? placeholder}
+            </span>
+            <button
+              type="button"
+              onClick={close}
+              className="text-[11px] font-extrabold text-sagedeep px-2 py-1"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+      <ul
+        role="listbox"
+        className={
+          isSheet
+            ? "flex-1 overflow-y-auto overscroll-contain pb-[calc(12px+env(safe-area-inset-bottom))]"
+            : ""
+        }
+      >
+        {options.map((o) => (
+          <li
+            key={o.value}
+            role="option"
+            aria-selected={o.value === value}
+            onClick={() => choose(o.value)}
+            className={`flex items-center gap-2.5 cursor-pointer ${
+              isSheet ? "px-4 py-3.5 text-[15px] min-h-[48px]" : "px-3.5 py-2.5 text-sm"
+            } ${o.value === value ? "font-bold text-sagedeep bg-goodbg/60" : ""}`}
+          >
+            {o.icon && <span className="text-base leading-none">{o.icon}</span>}
+            <span className="flex-1 truncate">{o.label}</span>
+            {o.value === value && <span className="text-sagedeep">✓</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 
   return (
@@ -139,14 +211,7 @@ export default function Select({
         open &&
         createPortal(
           <div data-select-portal="true">
-            <div
-              className="fixed inset-0 z-[60] bg-ink/10"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setOpen(false);
-              }}
-            />
+            <div className="fixed inset-0 z-[60] bg-ink/20" onClick={close} />
             {list}
           </div>,
           document.body,

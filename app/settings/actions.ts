@@ -206,11 +206,12 @@ export async function updateCategory(formData: FormData) {
   });
   if (!parsed.success) back("/settings/categories", "Name cannot be empty", true);
   const { name, icon } = parsed.data!;
+  const budget = Math.abs(Math.round(Number(formData.get("budget") ?? 0)));
   const conflict = await prisma.category.findFirst({
     where: { userId, name, type: existing!.type, NOT: { id } },
   });
   if (conflict) back("/settings/categories", `"${name}" already exists`, true);
-  await prisma.category.update({ where: { id }, data: { name, icon } });
+  await prisma.category.update({ where: { id }, data: { name, icon, budget: BigInt(budget) } });
   revalidatePath("/", "layout");
   back("/settings/categories", "Category updated");
 }
