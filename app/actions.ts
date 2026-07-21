@@ -193,6 +193,13 @@ export async function payDebtMonth(formData: FormData) {
   const account = accountId
     ? await prisma.finAccount.findFirst({ where: { id: accountId, userId } })
     : null;
+  const debtCategory = account
+    ? await prisma.category.upsert({
+        where: { userId_name_type: { userId, name: "Debt", type: "EXPENSE" } },
+        create: { userId, name: "Debt", type: "EXPENSE", icon: "🏦" },
+        update: {},
+      })
+    : null;
   await prisma.$transaction(async (tx) => {
     let transactionId: string | null = null;
     if (account) {
@@ -200,6 +207,7 @@ export async function payDebtMonth(formData: FormData) {
         data: {
           userId,
           accountId: account.id,
+          categoryId: debtCategory?.id,
           amount: BigInt(amount),
           direction: "OUT",
           note: `Debt payment — ${debt.lender}`,

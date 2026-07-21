@@ -8,8 +8,12 @@ import { getSessionUserId } from "@/lib/auth";
 import {
   aiExtractTransactions,
   extractFileText,
+  fileToImageInput,
+  imageExtension,
   importRowSchema,
   MAX_FILE_BYTES,
+  MAX_IMAGE_BYTES,
+  type AIInput,
 } from "@/lib/importer";
 
 async function requireUser(): Promise<string> {
@@ -25,23 +29,33 @@ export async function startImport(formData: FormData) {
     redirect("/import?err=" + encodeURIComponent("Please choose a file"));
   }
   const f = file as File;
-  if (f.size > MAX_FILE_BYTES) {
-    redirect("/import?err=" + encodeURIComponent("File is too large — max 2 MB"));
-  }
-
-  let text = "";
-  try {
-    text = await extractFileText(f);
-  } catch (e) {
-    redirect("/import?err=" + encodeURIComponent((e as Error).message));
-  }
-  if (text.trim().length < 40) {
+  const isImage = imageExtension(f.name) !== null;
+  if (f.size > (isImage ? MAX_IMAGE_BYTES : MAX_FILE_BYTES)) {
     redirect(
       "/import?err=" +
-        encodeURIComponent(
-          "Could not read text from this file. Scanned/image PDFs are not supported yet.",
-        ),
+        encodeURIComponent(isImage ? "Image is too large — max 5 MB" : "File is too large — max 2 MB"),
     );
+  }
+
+  let input: AIInput;
+  if (isImage) {
+    input = await fileToImageInput(f);
+  } else {
+    let text = "";
+    try {
+      text = await extractFileText(f);
+    } catch (e) {
+      redirect("/import?err=" + encodeURIComponent((e as Error).message));
+    }
+    if (text.trim().length < 40) {
+      redirect(
+        "/import?err=" +
+          encodeURIComponent(
+            "Could not read text from this file. For scanned PDFs, take a screenshot and upload it as an image instead.",
+          ),
+      );
+    }
+    input = { kind: "text", text };
   }
 
   const [categories, accounts] = await Promise.all([
@@ -52,7 +66,7 @@ export async function startImport(formData: FormData) {
   let rows;
   try {
     rows = await aiExtractTransactions(
-      text,
+      input,
       categories.map((c) => c.name),
       accounts.map((a) => a.name),
     );

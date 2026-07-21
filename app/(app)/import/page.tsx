@@ -30,7 +30,7 @@ export default async function ImportPage() {
             type="file"
             name="file"
             required
-            accept=".xlsx,.xls,.csv,.pdf"
+            accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.webp"
             className="w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-goodbg file:text-sagedeep file:font-bold file:px-4 file:py-2.5 file:cursor-pointer"
           />
           <SubmitButton
@@ -43,8 +43,8 @@ export default async function ImportPage() {
       </div>
 
       <ul className="text-[11.5px] text-inksoft space-y-1.5">
-        <li>• Supported: Excel (.xlsx/.xls), CSV, and text-based PDF — max 2 MB, 300 rows.</li>
-        <li>• Scanned/photo PDFs are not supported yet.</li>
+        <li>• Supported: Excel (.xlsx/.xls), CSV, text-based PDF (max 2 MB), and photos or screenshots (.png/.jpg/.webp, max 5 MB) — up to 300 rows.</li>
+        <li>• For scanned PDFs: screenshot the page and upload the image instead.</li>
         <li>
           • The file content is sent to OpenAI to be read. Do not upload files you don&apos;t want
           processed there.
