@@ -26,6 +26,11 @@ export default function Popover({
       // component (e.g. a Select option) removes the clicked node on this event
       const path = e.composedPath();
       if (ref.current && path.includes(ref.current)) return;
+      // dropdowns render in a portal on document.body but belong to this popover
+      const inPortal = path.some(
+        (n) => n instanceof HTMLElement && n.dataset.selectPortal === "true",
+      );
+      if (inPortal) return;
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -57,7 +62,7 @@ export default function Popover({
       {open && (
         <div
           ref={panelRef}
-          className={`absolute z-30 ${width} max-h-[min(70vh,420px)] overflow-y-auto bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2 ${
+          className={`absolute z-30 ${width} max-h-[min(70vh,420px)] overflow-y-auto overscroll-contain bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2 ${
             flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
           } ${alignLeft ? "left-0" : "right-0"}`}
         >

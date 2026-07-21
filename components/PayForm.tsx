@@ -33,7 +33,13 @@ export default function PayForm({
         className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
       />
       <label className="block text-[10.5px] font-bold text-inksoft">Pay from account</label>
-      <Select name="accountId" required defaultValue={accounts[0]?.value} options={accounts} />
+      <Select
+        name="accountId"
+        required
+        label="Pay from account"
+        defaultValue={accounts[0]?.value}
+        options={accounts}
+      />
       <SubmitButton
         className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2"
         pendingText="Paying…"

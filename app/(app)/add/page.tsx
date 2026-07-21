@@ -60,6 +60,7 @@ export default async function AddPage({
           <label className="block text-xs font-semibold text-inksoft mb-1.5">Category</label>
           <Select
             name="categoryId"
+            label="Category"
             placeholder="No category"
             options={[
               { value: "", label: "No category" },
@@ -74,6 +75,7 @@ export default async function AddPage({
           <Select
             name="accountId"
             required
+            label="Account"
             defaultValue={accounts[0]?.id}
             options={accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }))}
           />
