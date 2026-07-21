@@ -24,6 +24,7 @@ model User {
   snapshots    MonthlySnapshot[]
   settings     Settings?
   imports      ImportBatch[]
+  goals        Goal[]
 }
 
 model ImportBatch {
@@ -145,19 +146,19 @@ enum Direction {
 }
 
 model Transaction {
-  id         String     @id @default(cuid())
-  userId     String
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId  String
-  account    FinAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  categoryId String?
-  category   Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  date       DateTime   @default(now())
-  amount     BigInt
-  direction  Direction
-  note          String    @default("")
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId     String
+  account       FinAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId    String?
+  category      Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  date          DateTime   @default(now())
+  amount        BigInt
+  direction     Direction
+  note          String     @default("")
   plannedId     String?
-  plannedMonth  DateTime? @db.Date
+  plannedMonth  DateTime?  @db.Date
   importBatchId String?
 
   @@unique([plannedId, plannedMonth])
@@ -190,6 +191,31 @@ model PlannedTransaction {
   category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   active     Boolean     @default(true)
   createdAt  DateTime    @default(now())
+}
+
+model Goal {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  icon         String    @default("🎯")
+  targetAmount BigInt
+  targetDate   DateTime? @db.Date
+  note         String    @default("")
+  advice       String    @default("")
+  advisedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  contributions GoalContribution[]
+}
+
+model GoalContribution {
+  id            String   @id @default(cuid())
+  goalId        String
+  goal          Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  amount        BigInt
+  transactionId String?
+  createdAt     DateTime @default(now())
 }
 
 model MonthlySnapshot {

@@ -103,13 +103,72 @@ export async function toggleArchiveAccount(formData: FormData) {
 export async function deleteFinAccount(formData: FormData) {
   const userId = await requireUser();
   const id = String(formData.get("id") ?? "");
+  const mode = String(formData.get("mode") ?? "move");
+  const targetId = String(formData.get("targetAccountId") ?? "");
+  const path = "/settings/accounts";
+
+  const account = await prisma.finAccount.findFirst({ where: { id, userId } });
+  if (!account) back(path, "Account not found", true);
   const txCount = await prisma.transaction.count({ where: { accountId: id, userId } });
-  if (txCount > 0) {
-    back("/settings/accounts", "This account has transactions — archive it instead", true);
+
+  if (txCount === 0) {
+    await prisma.finAccount.delete({ where: { id } });
+    revalidatePath("/", "layout");
+    back(path, `"${account!.name}" deleted`);
   }
-  await prisma.finAccount.deleteMany({ where: { id, userId } });
+
+  if (mode === "move") {
+    const target = await prisma.finAccount.findFirst({
+      where: { id: targetId, userId, archived: false, NOT: { id } },
+    });
+    if (!target) back(path, "Choose another account to move the history into", true);
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.transaction.updateMany({
+          where: { userId, accountId: id },
+          data: { accountId: target!.id },
+        });
+        await tx.plannedTransaction.updateMany({
+          where: { userId, accountId: id },
+          data: { accountId: target!.id },
+        });
+        await tx.finAccount.update({
+          where: { id: target!.id },
+          data: { balance: { increment: account!.balance } },
+        });
+        await tx.finAccount.delete({ where: { id } });
+      },
+      { timeout: 30_000 },
+    );
+    revalidatePath("/", "layout");
+    back(
+      path,
+      `"${account!.name}" deleted — ${txCount} transaction${txCount === 1 ? "" : "s"} and its balance moved to ${target!.name}`,
+    );
+  }
+
+  await prisma.$transaction(
+    async (tx) => {
+      const txs = await tx.transaction.findMany({ where: { userId, accountId: id } });
+      const txIds = txs.map((t) => t.id);
+      const payments = await tx.debtPayment.findMany({ where: { transactionId: { in: txIds } } });
+      for (const p of payments) {
+        await tx.debt.updateMany({
+          where: { id: p.debtId, status: "PAID_OFF" },
+          data: { status: "ACTIVE" },
+        });
+      }
+      await tx.debtPayment.deleteMany({ where: { transactionId: { in: txIds } } });
+      await tx.goalContribution.deleteMany({ where: { transactionId: { in: txIds } } });
+      await tx.finAccount.delete({ where: { id } });
+    },
+    { timeout: 30_000 },
+  );
   revalidatePath("/", "layout");
-  back("/settings/accounts", "Account deleted");
+  back(
+    path,
+    `"${account!.name}" and its ${txCount} transaction${txCount === 1 ? "" : "s"} were deleted`,
+  );
 }
 
 /* ---------- categories ---------- */

@@ -26,7 +26,9 @@ export default function Select({
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const path = e.composedPath();
+      if (rootRef.current && path.includes(rootRef.current)) return;
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);

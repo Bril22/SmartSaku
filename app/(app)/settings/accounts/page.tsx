@@ -5,6 +5,7 @@ import { getMoney } from "@/lib/money";
 import { addAccount } from "@/app/actions";
 import { deleteFinAccount, renameFinAccount, toggleArchiveAccount } from "@/app/settings/actions";
 import MoneyInput from "@/components/MoneyInput";
+import Popover from "@/components/Popover";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 
@@ -66,11 +67,60 @@ export default async function ManageAccountsPage() {
                       {a.archived ? "Restore" : "Archive"}
                     </button>
                   </form>
-                  {txCount === 0 && (
+                  {txCount === 0 ? (
                     <form action={deleteFinAccount}>
                       <input type="hidden" name="id" value={a.id} />
                       <button className="font-extrabold text-bad">Delete</button>
                     </form>
+                  ) : (
+                    <Popover
+                      trigger="Delete"
+                      triggerClass="font-extrabold text-bad text-[11.5px]"
+                      width="w-72"
+                    >
+                      <div className="text-[11px] font-bold text-inksoft">
+                        {a.name} has {txCount} transaction{txCount === 1 ? "" : "s"}. What should
+                        happen to them?
+                      </div>
+                      <form action={deleteFinAccount} className="space-y-2 border-t border-line pt-2">
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="mode" value="move" />
+                        <label className="block text-[10.5px] font-bold text-sagedeep">
+                          Recommended — keep the history
+                        </label>
+                        <Select
+                          name="targetAccountId"
+                          required
+                          defaultValue={accounts.find((x) => x.id !== a.id && !x.archived)?.id}
+                          options={accounts
+                            .filter((x) => x.id !== a.id && !x.archived)
+                            .map((x) => ({ value: x.id, label: x.name, icon: TYPE_ICON[x.type] }))}
+                        />
+                        <SubmitButton
+                          className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2"
+                          pendingText="Moving…"
+                        >
+                          Move history here & delete
+                        </SubmitButton>
+                        <p className="text-[10px] text-inksoft">
+                          Transactions, planned items, and the {money.rp(Number(a.balance))} balance
+                          move to the chosen account.
+                        </p>
+                      </form>
+                      <form action={deleteFinAccount} className="border-t border-line pt-2">
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="mode" value="purge" />
+                        <SubmitButton
+                          className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2"
+                          pendingText="Deleting…"
+                        >
+                          Delete account + all its transactions
+                        </SubmitButton>
+                        <p className="text-[10px] text-bad mt-1">
+                          History is removed from reports. Debt months paid from here reopen.
+                        </p>
+                      </form>
+                    </Popover>
                   )}
                 </span>
               </div>
@@ -118,8 +168,9 @@ export default async function ManageAccountsPage() {
       </form>
 
       <p className="text-[11.5px] text-inksoft mt-4">
-        Accounts with transactions can be archived (hidden everywhere) but not deleted, so your
-        history stays correct.
+        Archiving hides an account everywhere but keeps its history. Deleting one that has
+        transactions asks first whether to move that history to another account (recommended) or
+        remove it completely.
       </p>
     </div>
   );

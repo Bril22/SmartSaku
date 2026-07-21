@@ -156,6 +156,10 @@ export async function updateTransaction(formData: FormData) {
       where: { transactionId: id },
       data: { amount: BigInt(amount) },
     }),
+    prisma.goalContribution.updateMany({
+      where: { transactionId: id },
+      data: { amount: BigInt(amount) },
+    }),
   ]);
   revalidatePath("/", "layout");
   redirect(`${backTo}&ok=` + encodeURIComponent("Transaction updated"));
@@ -168,10 +172,10 @@ export async function deleteTransaction(formData: FormData) {
   const old = await prisma.transaction.findFirst({ where: { id, userId } });
   if (!old) redirect(`${backTo}&err=` + encodeURIComponent("Transaction not found"));
   const effect = old!.direction === "IN" ? old!.amount : -old!.amount;
-  const linkedPayment = await prisma.debtPayment.findFirst({
-    where: { transactionId: id },
-    include: { debt: true },
-  });
+  const [linkedPayment, linkedContribution] = await Promise.all([
+    prisma.debtPayment.findFirst({ where: { transactionId: id }, include: { debt: true } }),
+    prisma.goalContribution.findFirst({ where: { transactionId: id } }),
+  ]);
   await prisma.$transaction(async (tx) => {
     await tx.finAccount.update({
       where: { id: old!.accountId },
@@ -184,12 +188,17 @@ export async function deleteTransaction(formData: FormData) {
         data: { status: "ACTIVE" },
       });
     }
+    if (linkedContribution) {
+      await tx.goalContribution.delete({ where: { id: linkedContribution.id } });
+    }
     await tx.transaction.delete({ where: { id } });
   });
   revalidatePath("/", "layout");
   const msg = linkedPayment
     ? `Deleted — balance restored and ${linkedPayment.debt.lender} reopened`
-    : "Transaction deleted — balance restored";
+    : linkedContribution
+      ? "Deleted — balance restored and the goal contribution removed"
+      : "Transaction deleted — balance restored";
   redirect(`${backTo}&ok=` + encodeURIComponent(msg));
 }
 

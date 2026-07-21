@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export default function Popover({
   trigger,
@@ -14,12 +14,19 @@ export default function Popover({
   width?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
+  const [alignLeft, setAlignLeft] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      // composedPath is captured at dispatch, so it still works when an inner
+      // component (e.g. a Select option) removes the clicked node on this event
+      const path = e.composedPath();
+      if (ref.current && path.includes(ref.current)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -32,6 +39,16 @@ export default function Popover({
     };
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current || !ref.current) return;
+    const panel = panelRef.current.getBoundingClientRect();
+    const anchor = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - anchor.bottom;
+    const spaceAbove = anchor.top;
+    setFlipUp(spaceBelow < panel.height + 16 && spaceAbove > spaceBelow);
+    setAlignLeft(anchor.right - panel.width < 8 && anchor.left + panel.width < window.innerWidth - 8);
+  }, [open]);
+
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen((o) => !o)} className={triggerClass}>
@@ -39,7 +56,10 @@ export default function Popover({
       </button>
       {open && (
         <div
-          className={`absolute right-0 z-30 mt-1.5 ${width} bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2`}
+          ref={panelRef}
+          className={`absolute z-30 ${width} max-h-[min(70vh,420px)] overflow-y-auto bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2 ${
+            flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } ${alignLeft ? "left-0" : "right-0"}`}
         >
           {children}
         </div>
