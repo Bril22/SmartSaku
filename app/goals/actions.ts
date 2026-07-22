@@ -166,14 +166,17 @@ export async function deleteGoalContribution(formData: FormData) {
   back("Contribution undone — money returned to the account");
 }
 
-export async function askGoalAdvice(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
-  const id = String(formData.get("id") ?? "");
+const SAKU_SYSTEM =
+  "You are Saku-Kun, a warm and practical personal finance guide for an Indonesian user (amounts in IDR). " +
+  "Answer in under 130 words, be concrete with numbers and months, plain English and friendly. " +
+  "No financial-advice disclaimers — the app already shows one.";
+
+async function goalContext(userId: string, spaceId: string, id: string) {
   const goal = await prisma.goal.findFirst({
     where: { id, spaceId },
     include: { contributions: true },
   });
-  if (!goal) back("Goal not found", true);
+  if (!goal) return null;
 
   const [debts, accounts, planned, settings] = await Promise.all([
     getDebtSummaries(spaceId),
@@ -203,6 +206,15 @@ export async function askGoalAdvice(formData: FormData) {
       (goal!.targetDate ? `, wanted by ${monthLabel(goal!.targetDate)}` : ", no target date") +
       `, already saved Rp${rupiah(saved)}`,
   ].join("\n");
+  return { goal: goal!, summary };
+}
+
+export async function askGoalAdvice(formData: FormData) {
+  const { userId, spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  const ctx = await goalContext(userId, spaceId, id);
+  if (!ctx) back("Goal not found", true);
+  const { summary } = ctx!;
 
   let advice = "";
   try {
@@ -213,10 +225,9 @@ export async function askGoalAdvice(formData: FormData) {
         {
           role: "system",
           content:
-            "You are Saku-Kun, a warm and practical personal finance guide for an Indonesian user (amounts in IDR). " +
-            "Given their finances and a savings goal, answer in under 130 words with: 1) is the goal realistic (and by when), " +
-            "2) a suggested monthly saving amount, 3) the smartest timing considering their debt schedule (e.g. after a debt finishes). " +
-            "Be concrete with numbers and months. Plain English, friendly, no financial-advice disclaimers (the app shows one).",
+            SAKU_SYSTEM +
+            " Given their finances and a savings goal, cover: 1) is the goal realistic (and by when), " +
+            "2) a suggested monthly saving amount, 3) the smartest timing considering their debt schedule.",
         },
         { role: "user", content: summary },
       ],
@@ -229,7 +240,68 @@ export async function askGoalAdvice(formData: FormData) {
   }
   if (!advice) back("Saku AI could not answer right now — try again", true);
 
-  await prisma.goal.update({ where: { id }, data: { advice, advisedAt: new Date() } });
+  await prisma.$transaction([
+    prisma.goal.update({ where: { id }, data: { advice, advisedAt: new Date() } }),
+    prisma.goalMessage.create({ data: { goalId: id, role: "AI", text: advice } }),
+  ]);
   revalidatePath(BACK);
   back("Saku-Kun has advice for you 🌱");
+}
+
+export async function replyToSaku(formData: FormData) {
+  const { userId, spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  const text = String(formData.get("text") ?? "").trim().slice(0, 500);
+  if (!text) back("Write a question first", true);
+
+  const ctx = await goalContext(userId, spaceId, id);
+  if (!ctx) back("Goal not found", true);
+
+  const history = await prisma.goalMessage.findMany({
+    where: { goalId: id },
+    orderBy: { createdAt: "asc" },
+    take: 20,
+  });
+
+  await prisma.goalMessage.create({ data: { goalId: id, role: "USER", text } });
+
+  let reply = "";
+  try {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const completion = await client.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: SAKU_SYSTEM },
+        { role: "user", content: `Here are my current numbers:\n${ctx!.summary}` },
+        ...history.map((m) => ({
+          role: (m.role === "AI" ? "assistant" : "user") as "assistant" | "user",
+          content: m.text,
+        })),
+        { role: "user", content: text },
+      ],
+    });
+    reply = completion.choices[0]?.message?.content?.trim() ?? "";
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status === 429) back("OpenAI has no API credit — top up and try again", true);
+    back("Saku AI could not answer right now — try again", true);
+  }
+  if (!reply) back("Saku AI could not answer right now — try again", true);
+
+  await prisma.goalMessage.create({ data: { goalId: id, role: "AI", text: reply } });
+  revalidatePath(BACK);
+  back("Saku-Kun replied 🌱");
+}
+
+export async function clearGoalChat(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  const goal = await prisma.goal.findFirst({ where: { id, spaceId } });
+  if (!goal) back("Goal not found", true);
+  await prisma.$transaction([
+    prisma.goalMessage.deleteMany({ where: { goalId: id } }),
+    prisma.goal.update({ where: { id }, data: { advice: "", advisedAt: null } }),
+  ]);
+  revalidatePath(BACK);
+  back("Chat cleared");
 }

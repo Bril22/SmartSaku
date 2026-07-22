@@ -173,6 +173,11 @@ model DebtAdjustment {
   createdAt DateTime @default(now())
 }
 
+enum ChatRole {
+  USER
+  AI
+}
+
 enum TxKind {
   NORMAL
   BALANCE_ADJUSTMENT
@@ -276,6 +281,7 @@ model Goal {
   createdAt    DateTime  @default(now())
 
   contributions GoalContribution[]
+  messages      GoalMessage[]
 }
 
 model GoalContribution {
@@ -334,4 +340,16 @@ model BalanceCorrection {
   createdAt DateTime   @default(now())
 
   @@index([accountId, createdAt])
+}
+
+/// running conversation with Saku-Kun about one goal
+model GoalMessage {
+  id        String   @id @default(cuid())
+  goalId    String
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  role      ChatRole
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([goalId, createdAt])
 }

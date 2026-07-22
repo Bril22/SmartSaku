@@ -19,6 +19,7 @@ import Popover from "@/components/Popover";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 import DateField from "@/components/DateField";
+import GoalChat from "@/components/GoalChat";
 
 export default async function FuturePage({
   searchParams,
@@ -47,7 +48,10 @@ export default async function FuturePage({
     getDebtSummaries(spaceId),
     prisma.goal.findMany({
       where: { spaceId },
-      include: { contributions: { orderBy: { createdAt: "desc" } } },
+      include: {
+        contributions: { orderBy: { createdAt: "desc" } },
+        messages: { orderBy: { createdAt: "asc" } },
+      },
       orderBy: { createdAt: "asc" },
     }),
     prisma.finAccount.findMany({
@@ -433,17 +437,18 @@ export default async function FuturePage({
                     </Popover>
                   )}
                 </div>
-                {g.advice && (
-                  <div className="mt-3 bg-goodbg rounded-md p-3 text-[12px] leading-relaxed">
-                    <div className="font-bold text-sagedeep mb-1">🌱 Saku-Kun says:</div>
-                    {g.advice}
-                    <div className="text-[10px] text-inksoft mt-1.5">
-                      {g.advisedAt &&
-                        g.advisedAt.toLocaleDateString("en-US", { day: "numeric", month: "short" })}{" "}
-                      · AI information, not licensed financial advice
-                    </div>
-                  </div>
-                )}
+                <GoalChat
+                  goalId={g.id}
+                  messages={g.messages.map((m) => ({
+                    id: m.id,
+                    role: m.role,
+                    text: m.text,
+                    at: m.createdAt.toLocaleDateString("en-US", {
+                      day: "numeric",
+                      month: "short",
+                    }),
+                  }))}
+                />
               </div>
             );
           })}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
@@ -56,7 +57,10 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <form action={renameDebt} className="flex items-center gap-2 mb-1">
+      <Link href="/money?tab=debts" className="text-xs font-bold text-sagedeep">
+        ‹ Debts
+      </Link>
+      <form action={renameDebt} className="flex items-center gap-2 mt-1 mb-1">
         <input type="hidden" name="debtId" value={debt.id} />
         <input
           name="lender"
@@ -252,7 +256,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         <>
           <h2 className="text-sm font-bold mb-2">Adjustment history</h2>
           <div className="space-y-1.5">
-            {debt.adjustments.map((a) => (
+            {debt.adjustments.slice(0, 5).map((a) => (
               <div key={a.id} className="bg-card border border-line rounded-md px-3.5 py-2.5 flex items-center gap-3 text-[12.5px]">
                 <span className="text-inksoft flex-1">
                   {a.createdAt.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
@@ -270,6 +274,11 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
                 </form>
               </div>
             ))}
+            {debt.adjustments.length > 5 && (
+              <p className="text-[11.5px] text-inksoft text-center pt-1">
+                Showing the 5 most recent of {debt.adjustments.length} adjustments.
+              </p>
+            )}
           </div>
         </>
       )}
