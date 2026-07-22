@@ -448,6 +448,7 @@ export async function payDebtMonth(formData: FormData) {
     const created = await tx.transaction.create({
       data: {
         userId,
+        spaceId,
         accountId: account!.id,
         categoryId: debtCategory.id,
         amount: BigInt(payAmount),

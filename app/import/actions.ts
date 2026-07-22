@@ -142,7 +142,7 @@ export async function confirmImport(formData: FormData) {
         let account = accountByName.get(r.accountName.toLowerCase());
         if (!account) {
           account = await tx.finAccount.create({
-            data: { userId, name: r.accountName, type: "BANK", balance: 0n },
+            data: { userId, spaceId, name: r.accountName, type: "BANK", balance: 0n },
           });
           accountByName.set(r.accountName.toLowerCase(), account);
         }
@@ -154,7 +154,13 @@ export async function confirmImport(formData: FormData) {
           let category = categoryByName.get(key);
           if (!category) {
             category = await tx.category.create({
-              data: { userId, name: r.categoryName, type, icon: r.direction === "IN" ? "💰" : "🏷️" },
+              data: {
+                userId,
+                spaceId,
+                name: r.categoryName,
+                type,
+                icon: r.direction === "IN" ? "💰" : "🏷️",
+              },
             });
             categoryByName.set(key, category);
           }
@@ -164,7 +170,7 @@ export async function confirmImport(formData: FormData) {
         const date = new Date(r.date + "T08:00:00Z");
         const dupe = await tx.transaction.findFirst({
           where: {
-            userId,
+            spaceId,
             accountId: account.id,
             date,
             amount: BigInt(r.amount),
@@ -180,6 +186,7 @@ export async function confirmImport(formData: FormData) {
         await tx.transaction.create({
           data: {
             userId,
+            spaceId,
             accountId: account.id,
             categoryId,
             date,

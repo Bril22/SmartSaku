@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getSessionUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 
 function csvCell(value: string | number): string {
   const s = String(value);
@@ -7,11 +7,10 @@ function csvCell(value: string | number): string {
 }
 
 export async function GET() {
-  const userId = await getSessionUserId();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
+  const { spaceId } = await requireSpace();
 
   const transactions = await prisma.transaction.findMany({
-    where: { userId },
+    where: { spaceId },
     include: { account: true, category: true },
     orderBy: { date: "desc" },
   });
@@ -20,7 +19,7 @@ export async function GET() {
   const rows = transactions.map((t) => [
     t.date.toISOString().slice(0, 10),
     t.direction === "IN" ? "Income" : "Expense",
-    Number(t.amount),
+    (Number(t.amount) / 100).toFixed(2),
     t.category?.name ?? "",
     t.account.name,
     t.note,

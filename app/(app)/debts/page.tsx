@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { requireSpace } from "@/lib/space";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import { DebtCurve } from "@/components/Charts";
 
 export default async function DebtsPage() {
-  const userId = await requireUserId();
-  const [debts, money] = await Promise.all([getDebtSummaries(userId), getMoney(userId)]);
+  const { userId, spaceId } = await requireSpace();
+  const [debts, money] = await Promise.all([getDebtSummaries(spaceId), getMoney(userId)]);
   const totalRemaining = debts.reduce((a, d) => a + d.remaining, 0);
 
   // debt remaining curve from future schedule entries
   const entries = await prisma.debtScheduleEntry.findMany({
-    where: { debt: { userId }, month: { gte: monthKey() } },
+    where: { debt: { spaceId }, month: { gte: monthKey() } },
     orderBy: { month: "asc" },
   });
   const byMonth = new Map<number, number>();
