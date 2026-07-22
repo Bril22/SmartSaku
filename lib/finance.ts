@@ -1,6 +1,17 @@
 import { prisma } from "./db";
 import { addMonths, monthKey } from "./format";
 
+/** a plan item counts in a month only while it is inside its own window */
+export function appliesIn(
+  item: { startMonth: Date | null; endMonth: Date | null },
+  month: Date,
+): boolean {
+  const t = month.getTime();
+  if (item.startMonth && item.startMonth.getTime() > t) return false;
+  if (item.endMonth && item.endMonth.getTime() < t) return false;
+  return true;
+}
+
 export type DebtSummary = {
   id: string;
   lender: string;
@@ -108,13 +119,13 @@ export async function getForecastBasis(userId: string, spaceId: string): Promise
     prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
     prisma.debt.findMany({ where: { spaceId }, include: { schedule: true, payments: true } }),
   ]);
+  const start = monthKey();
   const planIncome = plannedItems
-    .filter((p) => p.direction === "IN")
+    .filter((p) => p.direction === "IN" && appliesIn(p, start))
     .reduce((a, p) => a + Number(p.amount), 0);
   const planExpense = plannedItems
-    .filter((p) => p.direction === "OUT")
+    .filter((p) => p.direction === "OUT" && appliesIn(p, start))
     .reduce((a, p) => a + Number(p.amount), 0);
-  const start = monthKey();
   const debtThisMonth = debts.reduce(
     (a, d) =>
       a +
@@ -148,17 +159,13 @@ export async function projectFuture(userId: string, spaceId: string, years: numb
     prisma.debt.findMany({ where: { spaceId }, include: { schedule: true, payments: true, adjustments: true } }),
     prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
   ]);
-  const plannedIn = plannedItems
-    .filter((p) => p.direction === "IN")
-    .reduce((a, p) => a + Number(p.amount), 0);
-  const plannedOut = plannedItems
-    .filter((p) => p.direction === "OUT")
-    .reduce((a, p) => a + Number(p.amount), 0);
+  const planFor = (month: Date, direction: "IN" | "OUT") =>
+    plannedItems
+      .filter((p) => p.direction === direction && appliesIn(p, month))
+      .reduce((a, p) => a + Number(p.amount), 0);
   // a filled-in assumption overrides the plan; clearing it (0) falls back to the plan
   const incomeOverride = Number(settings?.monthlyIncome ?? 0);
   const expenseOverride = Number(settings?.monthlyExpense ?? 0);
-  const income0 = incomeOverride > 0 ? incomeOverride : plannedIn;
-  const living0 = expenseOverride > 0 ? expenseOverride : plannedOut;
   const growth = (settings?.salaryGrowthPct ?? 0) / 100;
   const inflation = (settings?.inflationPct ?? 0) / 100;
   const savingsRateMonthly = (settings?.savingsRatePct ?? 0) / 100 / 12;
@@ -203,8 +210,10 @@ export async function projectFuture(userId: string, spaceId: string, years: numb
   for (let i = 0; i < months; i++) {
     const m = addMonths(start, i);
     const yearIdx = Math.floor(i / 12);
-    let income = income0 * Math.pow(1 + growth, yearIdx);
-    let living = living0 * Math.pow(1 + inflation, yearIdx);
+    const baseIncome = incomeOverride > 0 ? incomeOverride : planFor(m, "IN");
+    const baseLiving = expenseOverride > 0 ? expenseOverride : planFor(m, "OUT");
+    let income = baseIncome * Math.pow(1 + growth, yearIdx);
+    let living = baseLiving * Math.pow(1 + inflation, yearIdx);
     if (i === 0) {
       income = Math.max(0, income - recordedIn);
       living = Math.max(0, living - recordedOut);

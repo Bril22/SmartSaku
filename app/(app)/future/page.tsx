@@ -308,7 +308,7 @@ export default async function FuturePage({
                 ? Math.ceil((target - saved) / monthsLeft)
                 : null;
             return (
-              <div key={g.id} className="bg-card border border-line rounded-lg p-4">
+              <div key={g.id} className="bg-card border border-line rounded-lg p-4 min-w-0">
                 <div className="flex items-center gap-2.5 mb-1.5">
                   <span className="text-xl">{g.icon}</span>
                   <div className="flex-1 min-w-0">

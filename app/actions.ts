@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { ensurePersonalSpace, requireSpace } from "@/lib/space";
 import { createSession, destroySession, getSessionUserId } from "@/lib/auth";
-import { formatMinor, monthKey } from "@/lib/format";
+import { addMonths, formatMinor, monthKey } from "@/lib/format";
 
 
 
@@ -738,6 +738,15 @@ export async function deleteDebtAdjustment(formData: FormData) {
 
 /* ---------- transaction plan ---------- */
 
+/** "none" = repeats forever; otherwise the number of months it runs for */
+function planWindow(formData: FormData): { startMonth: Date; endMonth: Date | null } {
+  const startMonth = monthKey();
+  const raw = String(formData.get("repeatMonths") ?? "none");
+  if (raw === "none") return { startMonth, endMonth: null };
+  const months = Math.min(600, Math.max(1, Math.round(Number(raw) || 1)));
+  return { startMonth, endMonth: addMonths(startMonth, months - 1) };
+}
+
 export async function addPlanned(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const name = String(formData.get("name") ?? "").trim();
@@ -757,8 +766,20 @@ export async function addPlanned(formData: FormData) {
     const owns = await prisma.category.count({ where: { id: categoryId, userId } });
     if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown category"));
   }
+  const { startMonth, endMonth } = planWindow(formData);
   await prisma.plannedTransaction.create({
-    data: { userId, spaceId, name, amount: BigInt(amount), direction, dayOfMonth, accountId, categoryId },
+    data: {
+      userId,
+      spaceId,
+      name,
+      amount: BigInt(amount),
+      direction,
+      dayOfMonth,
+      accountId,
+      categoryId,
+      startMonth,
+      endMonth,
+    },
   });
   revalidatePath("/", "layout");
   redirect("/money?tab=plan&ok=" + encodeURIComponent(`"${name}" added to your plan`));
@@ -784,9 +805,18 @@ export async function updatePlanned(formData: FormData) {
     const owns = await prisma.category.count({ where: { id: categoryId, userId } });
     if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown category"));
   }
+  const window = planWindow(formData);
   await prisma.plannedTransaction.update({
     where: { id },
-    data: { name, amount: BigInt(amount), dayOfMonth, accountId, categoryId },
+    data: {
+      name,
+      amount: BigInt(amount),
+      dayOfMonth,
+      accountId,
+      categoryId,
+      // keep the original start; only the end can be re-chosen
+      endMonth: window.endMonth,
+    },
   });
   revalidatePath("/", "layout");
   redirect("/money?tab=plan&ok=" + encodeURIComponent("Plan updated"));

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
-import { getDebtSummaries } from "@/lib/finance";
+import { appliesIn, getDebtSummaries } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import {
@@ -74,6 +74,28 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   );
 }
 
+function RepeatPicker({ defaultValue = "none" }: { defaultValue?: string }) {
+  return (
+    <div>
+      <label className="block text-[10.5px] font-bold text-inksoft mb-1">Repeat for</label>
+      <Select
+        name="repeatMonths"
+        defaultValue={defaultValue}
+        label="Repeat for"
+        options={[
+          { value: "none", label: "No end — every month", icon: "♾️" },
+          { value: "1", label: "This month only", icon: "1️⃣" },
+          { value: "2", label: "2 months", icon: "🗓️" },
+          { value: "3", label: "3 months", icon: "🗓️" },
+          { value: "6", label: "6 months", icon: "🗓️" },
+          { value: "12", label: "12 months", icon: "🗓️" },
+          { value: "24", label: "2 years", icon: "🗓️" },
+        ]}
+      />
+    </div>
+  );
+}
+
 async function PlanTab({ userId, spaceId, money }: Ctx) {
   const now = monthKey();
   const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
@@ -92,11 +114,21 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
       where: { spaceId, plannedId: { not: null }, date: { gte: now, lt: nextMonth } },
     }),
   ]);
+  // debts are part of the monthly outgoings, straight from their own schedule
+  const debtEntries = await prisma.debtScheduleEntry.findMany({
+    where: { debt: { spaceId }, month: now, planned: { gt: 0 } },
+    include: { debt: true },
+    orderBy: { planned: "desc" },
+  });
+  const debtDue = debtEntries.reduce((a, e) => a + Number(e.planned), 0);
+
   const recordedTxByPlanned = new Map(monthTx.map((t) => [t.plannedId as string, t.id]));
-  const income = items.filter((i) => i.direction === "IN");
-  const expense = items.filter((i) => i.direction === "OUT");
+  const live = items.filter((i) => appliesIn(i, now));
+  const income = live.filter((i) => i.direction === "IN");
+  const expense = live.filter((i) => i.direction === "OUT");
   const plannedIn = income.reduce((a, i) => a + Number(i.amount), 0);
-  const plannedOut = expense.reduce((a, i) => a + Number(i.amount), 0);
+  const planOnlyOut = expense.reduce((a, i) => a + Number(i.amount), 0);
+  const plannedOut = planOnlyOut + debtDue;
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));
   const catOptions = (type: "INCOME" | "EXPENSE") => [
     { value: "", label: "No category" },
@@ -132,6 +164,7 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
                   day {i.dayOfMonth}
                   {i.account ? ` · ${i.account.name}` : ""}
                   {i.category ? ` · ${i.category.name}` : ""}
+                  {i.endMonth ? ` · until ${monthLabel(i.endMonth)}` : " · no end"}
                 </div>
               </div>
               <span
@@ -186,6 +219,20 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
                         className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
                       />
                     </div>
+                    <RepeatPicker
+                      defaultValue={
+                        i.endMonth
+                          ? String(
+                              Math.max(
+                                1,
+                                (i.endMonth.getUTCFullYear() - now.getUTCFullYear()) * 12 +
+                                  (i.endMonth.getUTCMonth() - now.getUTCMonth()) +
+                                  1,
+                              ),
+                            )
+                          : "none"
+                      }
+                    />
                     <input
                       name="dayOfMonth"
                       type="number"
@@ -248,6 +295,7 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
           </div>
           <Select name="accountId" placeholder="Any account" options={[{ value: "", label: "Any account" }, ...accountOptions]} />
           <Select name="categoryId" placeholder="No category" options={catOptions(direction === "IN" ? "INCOME" : "EXPENSE")} />
+          <RepeatPicker />
           <SubmitButton
             className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
             pendingText="Adding…"
@@ -269,6 +317,9 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Planned expenses</div>
           <div className="font-extrabold text-peachdeep money mt-1">−{money.rpShort(plannedOut)}</div>
+          {debtDue > 0 && (
+            <div className="text-[9.5px] text-inksoft mt-0.5">incl. {money.rpShort(debtDue)} debt</div>
+          )}
         </div>
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Monthly surplus</div>
@@ -280,6 +331,35 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
 
       <Section title={`Income plan · ${monthLabel(now)}`} list={income} direction="IN" />
       <Section title={`Expense plan · ${monthLabel(now)}`} list={expense} direction="OUT" />
+
+      {debtEntries.length > 0 && (
+        <section className="mb-6">
+          <h2 className="text-sm font-bold mb-1">Debt installments · {monthLabel(now)}</h2>
+          <p className="text-[11.5px] text-inksoft mb-2">
+            Added automatically from each debt&apos;s payment schedule, from the first payment to
+            the last. Change them in the Debts tab.
+          </p>
+          <div className="space-y-2">
+            {debtEntries.map((e) => (
+              <Link
+                key={e.id}
+                href={`/debts/${e.debtId}`}
+                className="bg-card border border-line rounded-md p-3 flex items-center gap-2.5 hover:border-sagedeep"
+              >
+                <span className="text-base">🏦</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-[13px] truncate">{e.debt.lender}</div>
+                  <div className="text-[11px] text-inksoft truncate">from the payment schedule</div>
+                </div>
+                <span className="font-extrabold money text-[13px] whitespace-nowrap text-peachdeep">
+                  −{money.rpShort(Number(e.planned))}
+                </span>
+                <span className="text-inksoft text-xs">›</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <p className="text-[11.5px] text-inksoft">
         &quot;Record&quot; creates the real transaction for this month and updates the account

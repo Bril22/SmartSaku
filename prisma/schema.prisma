@@ -261,6 +261,10 @@ model PlannedTransaction {
   categoryId String?
   category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   active     Boolean     @default(true)
+  /// first month this item applies to; null means it has always applied
+  startMonth DateTime?   @db.Date
+  /// last month it applies to; null means it repeats with no end
+  endMonth   DateTime?   @db.Date
   createdAt  DateTime    @default(now())
 }
 
