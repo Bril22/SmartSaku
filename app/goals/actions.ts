@@ -4,7 +4,8 @@ import OpenAI from "openai";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireSpace } from "@/lib/space";
+import { rateLimit } from "@/lib/rate-limit";
+import { requireOwner, requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
 import { MINOR, monthLabel } from "@/lib/format";
@@ -60,7 +61,7 @@ export async function updateGoal(formData: FormData) {
 }
 
 export async function deleteGoal(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
+  const { userId, spaceId } = await requireOwner("/future");
   const id = String(formData.get("id") ?? "");
   const goal = await prisma.goal.findFirst({
     where: { id, spaceId },
@@ -95,7 +96,7 @@ export async function contributeGoal(formData: FormData) {
   const accountId = String(formData.get("accountId") ?? "");
   const goal = await prisma.goal.findFirst({ where: { id, spaceId } });
   const account = await prisma.finAccount.findFirst({
-    where: { id: accountId, userId, archived: false },
+    where: { id: accountId, spaceId, archived: false },
   });
   if (!goal || !amount) back("Please fill the amount", true);
   if (!account) back("Choose which account the money comes from", true);
@@ -211,6 +212,10 @@ async function goalContext(userId: string, spaceId: string, id: string) {
 
 export async function askGoalAdvice(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
+  const aiLimit = await rateLimit(`ai:askGoalAdvice:${userId}`, 10, 3600);
+  if (!aiLimit.ok) {
+    redirect("/future?err=" + encodeURIComponent("Too many AI requests — try again shortly"));
+  }
   const id = String(formData.get("id") ?? "");
   const ctx = await goalContext(userId, spaceId, id);
   if (!ctx) back("Goal not found", true);
@@ -247,6 +252,10 @@ export async function askGoalAdvice(formData: FormData) {
 
 export async function replyToSaku(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
+  const aiLimit = await rateLimit(`ai:replyToSaku:${userId}`, 20, 3600);
+  if (!aiLimit.ok) {
+    redirect("/future?err=" + encodeURIComponent("Too many AI requests — try again shortly"));
+  }
   const id = String(formData.get("id") ?? "");
   const text = String(formData.get("text") ?? "").trim().slice(0, 500);
   if (!text) back("Write a question first", true);

@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { requireSpace } from "@/lib/space";
-import { destroySession, getSessionUserId } from "@/lib/auth";
+import { requireOwner, requireSpace } from "@/lib/space";
+import { createSession, destroySession, revokeSessions } from "@/lib/auth";
 import { CURRENCIES } from "@/lib/money";
 
 
@@ -53,23 +53,48 @@ export async function changePassword(formData: FormData) {
   const { current, next, confirm } = parsed.data!;
   if (next !== confirm) back("/settings", "The two new passwords do not match", true);
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user || !(await bcrypt.compare(current, user.passwordHash))) {
+  if (!user) back("/settings", "Account not found", true);
+  // an account created through Google has no password yet, so there is none to confirm
+  if (user!.passwordHash && !(await bcrypt.compare(current, user!.passwordHash))) {
     back("/settings", "Current password is wrong", true);
   }
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash: await bcrypt.hash(next, 10) },
   });
-  back("/settings", "Password changed 🔒");
+  // end sessions everywhere else, then keep this one signed in
+  await revokeSessions(userId);
+  await createSession(userId);
+  back("/settings", user!.passwordHash ? "Password changed 🔒" : "Password set 🔒");
 }
 
 export async function deleteMyAccount(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
+  const { userId } = await requireSpace();
   const email = String(formData.get("confirmEmail") ?? "").trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.email !== email) {
     back("/settings", "Email does not match — account NOT deleted", true);
   }
+
+  // deleting the user cascades away the shared rows they happened to create,
+  // which would quietly damage the space for everyone still in it
+  const ownedShared = await prisma.space.findMany({
+    where: {
+      personal: false,
+      members: { some: { userId, role: "OWNER" } },
+    },
+    include: { _count: { select: { members: true } } },
+  });
+  const blocking = ownedShared.filter((s) => s._count.members > 1);
+  if (blocking.length > 0) {
+    back(
+      "/settings",
+      `First hand over or delete the shared space${blocking.length > 1 ? "s" : ""} you own: ` +
+        blocking.map((s) => s.name).join(", "),
+      true,
+    );
+  }
+
   await prisma.user.delete({ where: { id: userId } });
   await destroySession();
   redirect("/login");
@@ -98,7 +123,7 @@ export async function toggleArchiveAccount(formData: FormData) {
 }
 
 export async function deleteFinAccount(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
+  const { userId, spaceId } = await requireOwner("/settings/accounts");
   const id = String(formData.get("id") ?? "");
   const mode = String(formData.get("mode") ?? "move");
   const targetId = String(formData.get("targetAccountId") ?? "");
@@ -116,7 +141,7 @@ export async function deleteFinAccount(formData: FormData) {
 
   if (mode === "move") {
     const target = await prisma.finAccount.findFirst({
-      where: { id: targetId, userId, archived: false, NOT: { id } },
+      where: { id: targetId, spaceId, archived: false, NOT: { id } },
     });
     if (!target) back(path, "Choose another account to move the history into", true);
     await prisma.$transaction(
@@ -214,7 +239,7 @@ export async function updateCategory(formData: FormData) {
 }
 
 export async function deleteCategory(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
+  const { userId, spaceId } = await requireOwner("/settings/categories");
   const id = String(formData.get("id") ?? "");
   await prisma.category.deleteMany({ where: { id, spaceId } });
   revalidatePath("/", "layout");

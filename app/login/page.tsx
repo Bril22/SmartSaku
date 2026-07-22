@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { login } from "@/app/actions";
 import SubmitButton from "@/components/SubmitButton";
+import GoogleButton, { googleError } from "@/components/GoogleButton";
 
 export default async function LoginPage({
   searchParams,
@@ -24,13 +25,22 @@ export default async function LoginPage({
         <p className="text-inksoft text-center mt-2 mb-8 text-sm">
           Your warm money manager. Sign in to continue.
         </p>
+        <div className="mb-4">
+          <GoogleButton label="Continue with Google" />
+          <div className="flex items-center gap-3 my-4">
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-[11px] font-bold text-inksoft uppercase tracking-wide">or</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+        </div>
+
         <form
           action={login}
           className="bg-card border border-line rounded-lg p-6 shadow-soft space-y-4"
         >
           {error && (
             <div className="bg-badbg text-bad rounded-md px-4 py-3 text-sm font-semibold">
-              Email or password is wrong. Please try again.
+              {googleError(error) ?? "Email or password is wrong. Please try again."}
             </div>
           )}
           <div>

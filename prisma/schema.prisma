@@ -12,7 +12,12 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
-  passwordHash String
+  passwordHash String?
+  /// bumped to invalidate every existing session for this user
+  sessionVersion Int    @default(0)
+  /// set when the account is linked to a Google identity
+  googleId     String?  @unique
+  image        String?
   createdAt    DateTime @default(now())
 
   accounts     FinAccount[]
@@ -232,6 +237,11 @@ model Transaction {
 
   @@unique([plannedId, plannedMonth])
   @@index([userId, date])
+  @@index([spaceId, date])
+  @@index([spaceId, accountId, date])
+  @@index([spaceId, categoryId, date])
+  @@index([importBatchId])
+  @@index([transferId])
 }
 
 model RecurringBill {
@@ -342,4 +352,11 @@ model GoalMessage {
   createdAt DateTime @default(now())
 
   @@index([goalId, createdAt])
+}
+
+/// fixed-window rate limiter; one row per key
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
 }

@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { ensurePersonalSpace, requireSpace } from "@/lib/space";
-import { createSession, destroySession, getSessionUserId } from "@/lib/auth";
+import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { nameFromEmail, setUpNewUser } from "@/lib/onboarding";
+import { ensurePersonalSpace, requireOwner, requireSpace } from "@/lib/space";
+import { createSession, destroySession, getSessionUserId, safeBackTo } from "@/lib/auth";
 import { addMonths, formatMinor, monthKey } from "@/lib/format";
 
 
@@ -16,11 +18,18 @@ import { addMonths, formatMinor, monthKey } from "@/lib/format";
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+
+  const perIp = await rateLimit(await clientKey("login"), 10, 300);
+  if (!perIp.ok) redirect("/login?error=rate");
+  const perAccount = await rateLimit(`login:email:${email}`, 5, 300);
+  if (!perAccount.ok) redirect("/login?error=rate");
+
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  // an account created through Google has no password to compare against
+  if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     redirect("/login?error=1");
   }
-  await createSession(user.id);
+  await createSession(user!.id);
   redirect("/");
 }
 
@@ -34,33 +43,19 @@ export async function register(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
 
+  const limit = await rateLimit(await clientKey("register"), 5, 3600);
+  if (!limit.ok) redirect("/register?error=rate");
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect("/register?error=email");
-  if (password.length < 6) redirect("/register?error=short");
+  if (password.length < 8) redirect("/register?error=short");
   if (password !== confirm) redirect("/register?error=match");
   if (await prisma.user.findUnique({ where: { email } })) redirect("/register?error=exists");
 
-  const name = email.split("@")[0].replace(/^./, (c) => c.toUpperCase());
+  const name = nameFromEmail(email);
   const user = await prisma.user.create({
     data: { email, name, passwordHash: await bcrypt.hash(password, 10) },
   });
-  // every user starts with a private personal space
-  const personalSpaceId = await ensurePersonalSpace(user.id);
-  await prisma.settings.create({ data: { userId: user.id } });
-  await prisma.finAccount.create({
-    data: { userId: user.id, spaceId: personalSpaceId, name: "Cash", type: "CASH", balance: 0n },
-  });
-  await prisma.category.createMany({
-    data: (
-      [
-        { name: "Salary", type: "INCOME", icon: "💰" },
-        { name: "Food", type: "EXPENSE", icon: "🍜" },
-        { name: "Rent", type: "EXPENSE", icon: "🏠" },
-        { name: "Family", type: "EXPENSE", icon: "👨‍👩‍👧" },
-        { name: "Transport", type: "EXPENSE", icon: "🚌" },
-        { name: "Other", type: "EXPENSE", icon: "🧾" },
-      ] as const
-    ).map((c) => ({ userId: user.id, spaceId: personalSpaceId, ...c })),
-  });
+  await setUpNewUser(user.id);
   await createSession(user.id);
   redirect("/?ok=" + encodeURIComponent(`Welcome to SmartSaku, ${name}! 🌱`));
 }
@@ -92,7 +87,7 @@ export async function addTransaction(formData: FormData) {
   const date = parseWhen(formData.get("date"));
   if (!amount || !accountId) redirect("/add?error=1");
 
-  const account = await prisma.finAccount.findFirst({ where: { id: accountId, userId } });
+  const account = await prisma.finAccount.findFirst({ where: { id: accountId, spaceId } });
   if (!account) redirect("/add?error=1");
 
   await prisma.$transaction([
@@ -126,7 +121,7 @@ export async function addAccount(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const type = String(formData.get("type") ?? "BANK") as "BANK" | "SAVINGS" | "EWALLET" | "CASH";
   const balance = Math.round(Number(formData.get("balance") ?? 0));
-  const backTo = String(formData.get("backTo") ?? "/money");
+  const backTo = safeBackTo(formData.get("backTo"), "/money");
   if (!name) redirect(backTo);
   await prisma.finAccount.create({ data: { userId, spaceId, name, type, balance: BigInt(balance) } });
   revalidatePath("/", "layout");
@@ -139,31 +134,33 @@ export async function updateAccountBalance(formData: FormData) {
   const balance = Math.round(Number(formData.get("balance") ?? 0));
   const mode = String(formData.get("mode") ?? "record");
   const reason = String(formData.get("reason") ?? "").trim();
-  const backTo = String(formData.get("backTo") ?? "/settings/accounts");
+  const backTo = safeBackTo(formData.get("backTo"), "/settings/accounts");
 
-  const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
-  if (!account) redirect(`${backTo}?err=` + encodeURIComponent("Account not found"));
+  // the balance is read and written inside one transaction with the row locked,
+  // so a payment landing at the same moment cannot be silently overwritten
+  const outcome = await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ balance: bigint }[]>`
+      SELECT "balance" FROM "FinAccount"
+      WHERE "id" = ${id} AND "spaceId" = ${spaceId}
+      FOR UPDATE
+    `;
+    if (locked.length === 0) return { status: "missing" as const };
 
-  const before = Number(account!.balance);
-  const diff = balance - before;
-  if (diff === 0) {
-    redirect(`${backTo}?ok=` + encodeURIComponent("Balance unchanged"));
-  }
+    const before = Number(locked[0].balance);
+    const diff = balance - before;
+    if (diff === 0) return { status: "unchanged" as const };
 
-  if (mode === "correct") {
-    // silent fix: no transaction, but keep a record of what changed
-    await prisma.$transaction([
-      prisma.finAccount.update({ where: { id }, data: { balance: BigInt(balance) } }),
-      prisma.balanceCorrection.create({
+    if (mode === "correct") {
+      // silent fix: no transaction, but keep a record of what changed
+      await tx.finAccount.update({ where: { id }, data: { balance: BigInt(balance) } });
+      await tx.balanceCorrection.create({
         data: { accountId: id, userId, before: BigInt(before), after: BigInt(balance), reason },
-      }),
-    ]);
-    redirect(`${backTo}?ok=` + encodeURIComponent("Balance corrected — logged for audit"));
-  }
+      });
+      return { status: "corrected" as const, diff };
+    }
 
-  // default: make the difference visible as a real transaction
-  await prisma.$transaction([
-    prisma.transaction.create({
+    // default: make the difference visible as a real transaction
+    await tx.transaction.create({
       data: {
         userId,
         spaceId,
@@ -173,9 +170,21 @@ export async function updateAccountBalance(formData: FormData) {
         note: reason || "Balance adjustment",
         kind: "BALANCE_ADJUSTMENT",
       },
-    }),
-    prisma.finAccount.update({ where: { id }, data: { balance: BigInt(balance) } }),
-  ]);
+    });
+    await tx.finAccount.update({ where: { id }, data: { balance: BigInt(balance) } });
+    return { status: "recorded" as const, diff };
+  });
+
+  if (outcome.status === "missing") {
+    redirect(`${backTo}?err=` + encodeURIComponent("Account not found"));
+  }
+  if (outcome.status === "unchanged") {
+    redirect(`${backTo}?ok=` + encodeURIComponent("Balance unchanged"));
+  }
+  if (outcome.status === "corrected") {
+    redirect(`${backTo}?ok=` + encodeURIComponent("Balance corrected — logged for audit"));
+  }
+  const diff = outcome.diff;
   redirect(
     `${backTo}?ok=` +
       encodeURIComponent(
@@ -244,8 +253,8 @@ export async function transferBetweenAccounts(formData: FormData) {
     redirect(`${back}?err=` + encodeURIComponent("Choose two different accounts"));
   }
   const [from, to] = await Promise.all([
-    prisma.finAccount.findFirst({ where: { id: fromId, userId, archived: false } }),
-    prisma.finAccount.findFirst({ where: { id: toId, userId, archived: false } }),
+    prisma.finAccount.findFirst({ where: { id: fromId, spaceId, archived: false } }),
+    prisma.finAccount.findFirst({ where: { id: toId, spaceId, archived: false } }),
   ]);
   if (!from || !to) redirect(`${back}?err=` + encodeURIComponent("Choose both accounts"));
 
@@ -302,10 +311,10 @@ export async function updateTransaction(formData: FormData) {
   const categoryId = String(formData.get("categoryId") ?? "") || null;
   const note = String(formData.get("note") ?? "");
   const dateRaw = String(formData.get("date") ?? "");
-  const backTo = String(formData.get("backTo") ?? "/money?tab=history");
+  const backTo = safeBackTo(formData.get("backTo"), "/money?tab=history");
 
   const old = await prisma.transaction.findFirst({ where: { id, spaceId } });
-  const newAccount = await prisma.finAccount.findFirst({ where: { id: accountId, userId } });
+  const newAccount = await prisma.finAccount.findFirst({ where: { id: accountId, spaceId } });
   if (!old || !newAccount || !amount) {
     redirect(`${backTo}&err=` + encodeURIComponent("Could not update the transaction"));
   }
@@ -342,7 +351,7 @@ export async function updateTransaction(formData: FormData) {
 export async function deleteTransaction(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
-  const backTo = String(formData.get("backTo") ?? "/money?tab=history");
+  const backTo = safeBackTo(formData.get("backTo"), "/money?tab=history");
   const old = await prisma.transaction.findFirst({ where: { id, spaceId } });
   if (!old) redirect(`${backTo}&err=` + encodeURIComponent("Transaction not found"));
   if (old!.transferId) {
@@ -403,14 +412,14 @@ export async function payDebtMonth(formData: FormData) {
   const monthIso = String(formData.get("month") ?? "");
   const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
   const accountId = String(formData.get("accountId") ?? "") || null;
-  const backTo = String(formData.get("backTo") ?? "/");
+  const backTo = safeBackTo(formData.get("backTo"), "/");
 
-  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt || !monthIso || amount <= 0) redirect(backTo);
   const month = new Date(monthIso);
 
   const account = await prisma.finAccount.findFirst({
-    where: { id: accountId ?? "", userId, archived: false },
+    where: { id: accountId ?? "", spaceId, archived: false },
   });
   if (!account) {
     redirect(`${backTo}?err=` + encodeURIComponent("Choose which account to pay from"));
@@ -424,6 +433,8 @@ export async function payDebtMonth(formData: FormData) {
   let monthFullyPaid = false;
   let paidNothing = false;
   await prisma.$transaction(async (tx) => {
+    // lock the debt row first: two quick submits must not both pass the cap check
+    await tx.$queryRaw`SELECT "id" FROM "Debt" WHERE "id" = ${debtId} FOR UPDATE`;
     const [entry, monthPaidAgg, totalPlannedAgg, totalPaidAgg, adjAgg] = await Promise.all([
       tx.debtScheduleEntry.findFirst({ where: { debtId, month } }),
       tx.debtPayment.aggregate({ where: { debtId, month }, _sum: { amount: true } }),
@@ -505,7 +516,7 @@ export async function adjustDebt(formData: FormData) {
   const debtId = String(formData.get("debtId") ?? "");
   const delta = Math.round(Number(formData.get("delta") ?? 0));
   const reason = String(formData.get("reason") ?? "");
-  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt || !delta) redirect(`/debts/${debtId}`);
   await prisma.debtAdjustment.create({
     data: { debtId, month: monthKey(), delta: BigInt(delta), reason },
@@ -593,7 +604,7 @@ export async function addScheduleEntry(formData: FormData) {
   const debtId = String(formData.get("debtId") ?? "");
   const planned = Math.abs(Math.round(Number(formData.get("planned") ?? 0)));
   const monthRaw = String(formData.get("month") ?? "");
-  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   const [y, m] = monthRaw.split("-").map(Number);
   if (!debt || !planned || !y || !m) {
     redirect(`/debts/${debtId}?err=` + encodeURIComponent("Please pick a month and an amount"));
@@ -612,7 +623,7 @@ export async function renameDebt(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const debtId = String(formData.get("debtId") ?? "");
   const lender = String(formData.get("lender") ?? "").trim();
-  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt) redirect("/money?tab=debts");
   if (!lender) {
     redirect(`/debts/${debtId}?err=` + encodeURIComponent("Name cannot be empty"));
@@ -629,9 +640,9 @@ export async function renameDebt(formData: FormData) {
 }
 
 export async function deleteDebt(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
+  const { userId, spaceId } = await requireOwner("/money?tab=debts");
   const debtId = String(formData.get("debtId") ?? "");
-  const debt = await prisma.debt.findFirst({ where: { id: debtId, userId } });
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt) redirect("/money?tab=debts");
   await prisma.debt.delete({ where: { id: debtId } });
   revalidatePath("/", "layout");
@@ -759,11 +770,11 @@ export async function addPlanned(formData: FormData) {
     redirect("/money?tab=plan&err=" + encodeURIComponent("Please fill the name and amount"));
   }
   if (accountId) {
-    const owns = await prisma.finAccount.count({ where: { id: accountId, userId } });
+    const owns = await prisma.finAccount.count({ where: { id: accountId, spaceId } });
     if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown account"));
   }
   if (categoryId) {
-    const owns = await prisma.category.count({ where: { id: categoryId, userId } });
+    const owns = await prisma.category.count({ where: { id: categoryId, spaceId } });
     if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown category"));
   }
   const { startMonth, endMonth } = planWindow(formData);
@@ -798,11 +809,11 @@ export async function updatePlanned(formData: FormData) {
     redirect("/money?tab=plan&err=" + encodeURIComponent("Could not update the plan item"));
   }
   if (accountId) {
-    const owns = await prisma.finAccount.count({ where: { id: accountId, userId } });
+    const owns = await prisma.finAccount.count({ where: { id: accountId, spaceId } });
     if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown account"));
   }
   if (categoryId) {
-    const owns = await prisma.category.count({ where: { id: categoryId, userId } });
+    const owns = await prisma.category.count({ where: { id: categoryId, spaceId } });
     if (owns === 0) redirect("/money?tab=plan&err=" + encodeURIComponent("Unknown category"));
   }
   const window = planWindow(formData);
@@ -833,7 +844,7 @@ export async function deletePlanned(formData: FormData) {
 export async function recordPlanned(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
-  const backTo = String(formData.get("backTo") ?? "/money?tab=plan");
+  const backTo = safeBackTo(formData.get("backTo"), "/money?tab=plan");
   const planned = await prisma.plannedTransaction.findFirst({ where: { id, spaceId } });
   if (!planned) redirect(backTo);
 
@@ -841,7 +852,7 @@ export async function recordPlanned(formData: FormData) {
 
   let accountId = planned!.accountId;
   if (accountId) {
-    const owns = await prisma.finAccount.count({ where: { id: accountId, userId, archived: false } });
+    const owns = await prisma.finAccount.count({ where: { id: accountId, spaceId, archived: false } });
     if (owns === 0) accountId = null;
   }
   if (!accountId) {

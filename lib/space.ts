@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "./db";
-import { getSessionUserId } from "./auth";
+import { readSession } from "./auth";
 
 const COOKIE = "smartsaku_space";
 
@@ -32,10 +32,15 @@ export async function ensurePersonalSpace(userId: string): Promise<string> {
 }
 
 export async function requireSpace(): Promise<ActiveSpace> {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  const exists = await prisma.user.count({ where: { id: userId } });
-  if (exists === 0) redirect("/login");
+  const session = await readSession();
+  if (!session) redirect("/login");
+  const { userId } = session;
+  // same query as before, but it now also enforces session revocation
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { sessionVersion: true },
+  });
+  if (!user || user.sessionVersion !== session.ver) redirect("/login");
 
   const jar = await cookies();
   const wanted = jar.get(COOKIE)?.value;
@@ -66,6 +71,22 @@ export async function requireSpace(): Promise<ActiveSpace> {
     role: membership!.role,
     shared: memberCount > 1,
   };
+}
+
+/**
+ * Structural deletes in a shared space are owner-only. Everyday money entry
+ * stays open to every member; removing an account, category, debt or goal
+ * destroys history for everyone, so it needs the owner.
+ */
+export async function requireOwner(back: string): Promise<ActiveSpace> {
+  const space = await requireSpace();
+  if (!space.personal && space.role !== "OWNER") {
+    redirect(
+      `${back}${back.includes("?") ? "&" : "?"}err=` +
+        encodeURIComponent("Only the owner of this shared space can do that"),
+    );
+  }
+  return space;
 }
 
 export async function listMySpaces(userId: string) {

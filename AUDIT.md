@@ -26,6 +26,23 @@ Database checked after the fix: no unscoped rows remain in any table.
 
 ---
 
+## Fixed in Phase G (commit pending)
+
+| Was | Now |
+|---|---|
+| Related records validated by `userId`, so a shared-space member could pass an id from another space | Every account, category, debt, goal and import is validated by `spaceId` |
+| `SpaceMember.role` ignored for money | Deleting an account, category, debt or goal is owner-only in a shared space |
+| `AUTH_SECRET` fell back to a hardcoded string | The app refuses to start without it |
+| Sessions could not be revoked | Every token carries a session version; changing a password or revoking ends other sessions |
+| No rate limiting | Login (per IP and per account), registration, OAuth callback and all three AI endpoints |
+| Open redirect through `backTo` | `safeBackTo()` accepts same-site absolute paths only, with tests |
+| Balance edits read then wrote outside a transaction | The row is locked with `SELECT … FOR UPDATE` inside the transaction |
+| Debt payments could be double-submitted past the cap | The debt row is locked before the cap is computed |
+| Indexes did not match the queries | Added `[spaceId, date]`, `[spaceId, accountId, date]`, `[spaceId, categoryId, date]`, `importBatchId`, `transferId` |
+| Export covered transactions only | Nine sections covering the whole space |
+| Deleting a user destroyed shared data they had created | Blocked while they own a shared space with other members |
+| Password change assumed a password existed | Handles Google-only accounts, and sets one |
+
 ## Open findings
 
 ### Critical — must fix before charging money

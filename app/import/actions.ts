@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
 import {
@@ -21,6 +22,10 @@ import {
 
 export async function startImport(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
+  const aiLimit = await rateLimit(`ai:import:${userId}`, 15, 3600);
+  if (!aiLimit.ok) {
+    redirect("/import?err=" + encodeURIComponent("Too many AI scans — try again shortly"));
+  }
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     redirect("/import?err=" + encodeURIComponent("Please choose a file"));
@@ -103,7 +108,7 @@ const confirmSchema = z.array(
 export async function confirmImport(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const batchId = String(formData.get("batchId") ?? "");
-  const batch = await prisma.importBatch.findFirst({ where: { id: batchId, userId } });
+  const batch = await prisma.importBatch.findFirst({ where: { id: batchId, spaceId } });
   if (!batch) redirect("/import?err=" + encodeURIComponent("Import not found"));
   if (batch!.status === "DONE") {
     redirect("/money?tab=history&ok=" + encodeURIComponent("This file was already imported"));
@@ -219,7 +224,7 @@ export async function confirmImport(formData: FormData) {
 export async function undoImport(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const batchId = String(formData.get("batchId") ?? "");
-  const batch = await prisma.importBatch.findFirst({ where: { id: batchId, userId } });
+  const batch = await prisma.importBatch.findFirst({ where: { id: batchId, spaceId } });
   if (!batch || batch.status !== "DONE") {
     redirect("/import?err=" + encodeURIComponent("This import cannot be undone"));
   }
