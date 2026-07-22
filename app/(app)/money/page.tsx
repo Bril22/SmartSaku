@@ -454,30 +454,24 @@ async function HistoryTab({ userId, spaceId, money, sp }: Ctx & { sp: Search }) 
   }
 
   const query = (sp.q ?? "").trim();
-  const searchResults = query
-    ? await prisma.transaction.findMany({
-        where: {
-          userId,
-          OR: [
-            { note: { contains: query, mode: "insensitive" } },
-            { category: { name: { contains: query, mode: "insensitive" } } },
-            { account: { name: { contains: query, mode: "insensitive" } } },
-          ],
-        },
-        include: { category: true, account: true },
-        orderBy: { date: "desc" },
-        take: 100,
-      })
-    : [];
+  const matches = query
+    ? {
+        OR: [
+          { note: { contains: query, mode: "insensitive" as const } },
+          { category: { name: { contains: query, mode: "insensitive" as const } } },
+          { account: { name: { contains: query, mode: "insensitive" as const } } },
+        ],
+      }
+    : {};
 
   const [monthTxs, rangeTxs] = await Promise.all([
     prisma.transaction.findMany({
-      where: { spaceId, date: { gte: monthStart, lt: monthEnd } },
+      where: { spaceId, date: { gte: monthStart, lt: monthEnd }, ...matches },
       include: { category: true, account: true },
       orderBy: { date: "desc" },
     }),
     prisma.transaction.findMany({
-      where: { spaceId, date: { gte: rangeStart, lt: rangeEnd } },
+      where: { spaceId, date: { gte: rangeStart, lt: rangeEnd }, ...matches },
       include: { category: true },
     }),
   ]);
@@ -508,72 +502,46 @@ async function HistoryTab({ userId, spaceId, money, sp }: Ctx & { sp: Search }) 
 
   return (
     <div>
-    <div className="flex items-center gap-2 mb-3 -mt-2">
-      <form method="GET" action="/money" className="flex-1 flex gap-2">
+    <div className="mb-3 -mt-2 space-y-2">
+      <form method="GET" action="/money" className="flex flex-col sm:flex-row gap-2">
         <input type="hidden" name="tab" value="history" />
+        <input type="hidden" name="month" value={sp.month ?? ""} />
+        <input type="hidden" name="range" value={range} />
+        <input type="hidden" name="kind" value={kind.toLowerCase()} />
         <input
           name="q"
           defaultValue={query}
           placeholder="Search notes, categories, accounts…"
-          className="flex-1 min-w-0 rounded-full border border-line bg-card px-4 py-2 text-xs"
+          className="w-full sm:flex-1 min-w-0 rounded-full border border-line bg-card px-4 py-3 text-sm"
         />
-        <button className="rounded-full bg-sagedeep text-cream2 px-4 py-2 text-xs font-extrabold shrink-0">
-          Search
-        </button>
+        <div className="flex gap-2">
+          <button className="flex-1 sm:flex-none rounded-full bg-sagedeep text-cream2 px-6 py-3 text-xs font-extrabold">
+            Search
+          </button>
+          {query && (
+            <Link
+              href={`/money?tab=history&month=${sp.month ?? ""}&range=${range}&kind=${kind.toLowerCase()}`}
+              className="rounded-full border border-line px-4 py-3 text-xs font-extrabold text-inksoft flex items-center"
+            >
+              Clear
+            </Link>
+          )}
+        </div>
       </form>
       <Link
         href="/import"
-        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-2 text-xs font-extrabold text-sagedeep shrink-0"
-        title="Import from file with AI"
+        className="flex items-center gap-2.5 rounded-full border border-line bg-card px-4 py-2.5 text-xs font-extrabold text-sagedeep"
       >
-        📄 AI
+        <span className="text-base">📄</span>
+        Scan a file with Saku AI
       </Link>
+      {query && (
+        <p className="text-[11.5px] text-inksoft px-1">
+          Chart and calendar below show only matches for “{query}”.
+        </p>
+      )}
     </div>
 
-    {query && (
-      <div className="bg-card border border-line rounded-lg p-4 mb-4">
-        <div className="flex items-baseline justify-between mb-2">
-          <h2 className="text-sm font-bold">
-            {searchResults.length} result{searchResults.length === 1 ? "" : "s"} for “{query}”
-          </h2>
-          <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
-            Clear
-          </Link>
-        </div>
-        <div className="space-y-1.5">
-          {searchResults.length === 0 && (
-            <p className="text-[12.5px] text-inksoft">Nothing matched. Try another word.</p>
-          )}
-          {searchResults.map((t) => (
-            <Link
-              key={t.id}
-              href={`/money/tx/${t.id}`}
-              className="bg-cream2 rounded-md px-3.5 py-2.5 flex items-center gap-3 hover:border-sagedeep border border-transparent"
-            >
-              <span className="text-base">
-                {t.category?.icon ?? (t.direction === "IN" ? "💰" : "💸")}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[13px] truncate">
-                  {t.category?.name || t.note || "Transaction"}
-                </div>
-                <div className="text-[11px] text-inksoft truncate">
-                  {t.account.name} ·{" "}
-                  {t.date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
-                  {t.note && t.category ? ` · ${t.note}` : ""}
-                </div>
-              </div>
-              <span
-                className={`font-extrabold money text-[13px] whitespace-nowrap ${t.direction === "IN" ? "text-sagedeep" : "text-peachdeep"}`}
-              >
-                {t.direction === "IN" ? "+" : "−"}
-                {money.rpShort(Number(t.amount))}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    )}
     <div className="md:grid md:grid-cols-2 md:gap-8 md:items-start">
       <div className="bg-card border border-line rounded-lg p-4 mb-5 md:mb-0">
         <div className="flex items-center justify-between mb-2">
@@ -655,6 +623,7 @@ async function HistoryTab({ userId, spaceId, money, sp }: Ctx & { sp: Search }) 
           month={month}
           txs={calTxs}
           fmtShort={{ code: money.code, ratePerIdr: money.ratePerIdr, symbol: money.symbol }}
+          dayQuery={query ? `?q=${encodeURIComponent(query)}` : ""}
         />
       </div>
     </div>

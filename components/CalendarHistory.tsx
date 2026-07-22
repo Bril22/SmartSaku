@@ -16,17 +16,22 @@ export type CalTx = {
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
+const DAY_LIMIT = 5;
+
 export default function CalendarHistory({
   year,
   month,
   txs,
   fmtShort,
+  dayQuery,
   currency,
 }: {
   year: number;
   month: number;
   txs: CalTx[];
   fmtShort: { code: string; ratePerIdr: number; symbol: string };
+  /** active filters, carried into the full-day page */
+  dayQuery?: string;
   currency?: never;
 }) {
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -43,6 +48,7 @@ export default function CalendarHistory({
     ? today.getDate()
     : [...byDay.keys()].sort((a, b) => b - a)[0] ?? 1;
   const [selected, setSelected] = useState(defaultDay);
+  const pad = (n: number) => String(n).padStart(2, "0");
   const dayTxs = byDay.get(selected) ?? [];
 
   const fmt = (idr: number) => {
@@ -102,7 +108,7 @@ export default function CalendarHistory({
         </div>
       )}
       <div className="space-y-1.5">
-        {dayTxs.map((t) => (
+        {dayTxs.slice(0, DAY_LIMIT).map((t) => (
           <Link
             key={t.id}
             href={`/money/tx/${t.id}`}
@@ -122,6 +128,14 @@ export default function CalendarHistory({
             <span className="text-inksoft text-xs">✎</span>
           </Link>
         ))}
+        {dayTxs.length > DAY_LIMIT && (
+          <Link
+            href={`/money/day/${year}-${pad(month + 1)}-${pad(selected)}${dayQuery ?? ""}`}
+            className="block text-center text-xs font-extrabold text-sagedeep py-2"
+          >
+            See all {dayTxs.length} transactions →
+          </Link>
+        )}
       </div>
     </div>
   );
