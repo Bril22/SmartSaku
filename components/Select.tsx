@@ -50,10 +50,11 @@ export default function Select({
       const r = triggerRef.current.getBoundingClientRect();
       const listHeight = Math.min(280, options.length * 44 + 12);
       const openUp = window.innerHeight - r.bottom < listHeight + 12 && r.top > listHeight;
+      const width = Math.min(r.width, window.innerWidth - 16);
       setAnchor({
-        top: openUp ? r.top - listHeight - 6 : r.bottom + 6,
-        left: Math.min(r.left, window.innerWidth - r.width - 8),
-        width: r.width,
+        top: Math.max(8, openUp ? r.top - listHeight - 6 : r.bottom + 6),
+        left: Math.min(Math.max(8, r.left), window.innerWidth - width - 8),
+        width,
       });
     };
     place();

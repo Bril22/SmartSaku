@@ -63,10 +63,7 @@ async function main() {
     create: {
       userId: user.id,
       monthlyIncome: 27_500_000n,
-      livingRent: 4_000_000n,
-      livingFood: 2_000_000n,
-      livingFamily: 3_000_000n,
-      livingOther: 1_000_000n,
+      monthlyExpense: 10_000_000n,
       salaryGrowthPct: 5,
       inflationPct: 3,
       savingsRatePct: 2,

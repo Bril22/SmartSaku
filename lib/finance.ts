@@ -91,6 +91,51 @@ export type ProjectionPoint = {
   netWorth: number;
 };
 
+export type ForecastBasis = {
+  income: number;
+  expense: number;
+  incomeFromPlan: boolean;
+  expenseFromPlan: boolean;
+  planIncome: number;
+  planExpense: number;
+  debtThisMonth: number;
+};
+
+/** What the forecast is currently built on, so the UI can explain itself. */
+export async function getForecastBasis(userId: string, spaceId: string): Promise<ForecastBasis> {
+  const [settings, plannedItems, debts] = await Promise.all([
+    prisma.settings.findUnique({ where: { userId } }),
+    prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
+    prisma.debt.findMany({ where: { spaceId }, include: { schedule: true, payments: true } }),
+  ]);
+  const planIncome = plannedItems
+    .filter((p) => p.direction === "IN")
+    .reduce((a, p) => a + Number(p.amount), 0);
+  const planExpense = plannedItems
+    .filter((p) => p.direction === "OUT")
+    .reduce((a, p) => a + Number(p.amount), 0);
+  const start = monthKey();
+  const debtThisMonth = debts.reduce(
+    (a, d) =>
+      a +
+      d.schedule
+        .filter((s) => s.month.getTime() === start.getTime())
+        .reduce((b, s) => b + Number(s.planned), 0),
+    0,
+  );
+  const incomeOverride = Number(settings?.monthlyIncome ?? 0);
+  const expenseOverride = Number(settings?.monthlyExpense ?? 0);
+  return {
+    income: incomeOverride > 0 ? incomeOverride : planIncome,
+    expense: expenseOverride > 0 ? expenseOverride : planExpense,
+    incomeFromPlan: incomeOverride <= 0,
+    expenseFromPlan: expenseOverride <= 0,
+    planIncome,
+    planExpense,
+    debtThisMonth,
+  };
+}
+
 /**
  * Long-term projection. Debt payments follow the remaining schedule
  * (future months only, scaled by outstanding adjustments); income grows
@@ -109,13 +154,11 @@ export async function projectFuture(userId: string, spaceId: string, years: numb
   const plannedOut = plannedItems
     .filter((p) => p.direction === "OUT")
     .reduce((a, p) => a + Number(p.amount), 0);
-  const income0 = plannedIn > 0 ? plannedIn : Number(settings?.monthlyIncome ?? 0);
-  const settingsLiving =
-    Number(settings?.livingRent ?? 0) +
-    Number(settings?.livingFood ?? 0) +
-    Number(settings?.livingFamily ?? 0) +
-    Number(settings?.livingOther ?? 0);
-  const living0 = plannedOut > 0 ? plannedOut : settingsLiving;
+  // a filled-in assumption overrides the plan; clearing it (0) falls back to the plan
+  const incomeOverride = Number(settings?.monthlyIncome ?? 0);
+  const expenseOverride = Number(settings?.monthlyExpense ?? 0);
+  const income0 = incomeOverride > 0 ? incomeOverride : plannedIn;
+  const living0 = expenseOverride > 0 ? expenseOverride : plannedOut;
   const growth = (settings?.salaryGrowthPct ?? 0) / 100;
   const inflation = (settings?.inflationPct ?? 0) / 100;
   const savingsRateMonthly = (settings?.savingsRatePct ?? 0) / 100 / 12;

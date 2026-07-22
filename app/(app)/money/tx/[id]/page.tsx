@@ -6,6 +6,7 @@ import { deleteTransaction, updateTransaction } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
+import DateField from "@/components/DateField";
 
 export default async function EditTransactionPage({
   params,
@@ -79,12 +80,7 @@ export default async function EditTransactionPage({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-inksoft mb-1.5">Date</label>
-            <input
-              type="date"
-              name="date"
-              defaultValue={dateValue}
-              className="w-full rounded-md border border-line bg-card px-3 py-3 text-sm"
-            />
+            <DateField name="date" defaultValue={dateValue} title="Transaction date" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-inksoft mb-1.5">Account</label>

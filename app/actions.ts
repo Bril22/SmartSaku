@@ -740,34 +740,37 @@ export async function recordPlanned(formData: FormData) {
 /* ---------- settings ---------- */
 
 export async function updateSettings(formData: FormData) {
-  const { userId, spaceId } = await requireSpace();
-  const num = (k: string) => Math.round(Number(formData.get(k) ?? 0));
+  const { userId } = await requireSpace();
+  const num = (k: string) => Math.max(0, Math.round(Number(formData.get(k) ?? 0)));
   const flt = (k: string) => Number(formData.get(k) ?? 0);
+  const values = {
+    monthlyIncome: BigInt(num("monthlyIncome")),
+    monthlyExpense: BigInt(num("monthlyExpense")),
+    salaryGrowthPct: flt("salaryGrowthPct"),
+    inflationPct: flt("inflationPct"),
+    savingsRatePct: flt("savingsRatePct"),
+  };
   await prisma.settings.upsert({
     where: { userId },
-    create: {
-      userId,
-      monthlyIncome: BigInt(num("monthlyIncome")),
-      livingRent: BigInt(num("livingRent")),
-      livingFood: BigInt(num("livingFood")),
-      livingFamily: BigInt(num("livingFamily")),
-      livingOther: BigInt(num("livingOther")),
-      salaryGrowthPct: flt("salaryGrowthPct"),
-      inflationPct: flt("inflationPct"),
-      savingsRatePct: flt("savingsRatePct"),
-    },
-    update: {
-      monthlyIncome: BigInt(num("monthlyIncome")),
-      livingRent: BigInt(num("livingRent")),
-      livingFood: BigInt(num("livingFood")),
-      livingFamily: BigInt(num("livingFamily")),
-      livingOther: BigInt(num("livingOther")),
-      salaryGrowthPct: flt("salaryGrowthPct"),
-      inflationPct: flt("inflationPct"),
-      savingsRatePct: flt("savingsRatePct"),
-    },
+    create: { userId, ...values },
+    update: values,
   });
   revalidatePath("/future");
   revalidatePath("/");
-  redirect("/future?ok=" + encodeURIComponent("Assumptions saved"));
+  redirect("/future?ok=" + encodeURIComponent("Assumptions saved — forecast updated"));
+}
+
+export async function clearAssumptions() {
+  const { userId } = await requireSpace();
+  const values = { monthlyIncome: 0n, monthlyExpense: 0n };
+  await prisma.settings.upsert({
+    where: { userId },
+    create: { userId, ...values },
+    update: values,
+  });
+  revalidatePath("/future");
+  revalidatePath("/");
+  redirect(
+    "/future?ok=" + encodeURIComponent("Cleared — forecast now follows your plan and debts"),
+  );
 }

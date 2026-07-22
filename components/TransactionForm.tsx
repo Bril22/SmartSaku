@@ -5,6 +5,7 @@ import { useState } from "react";
 import MoneyInput from "@/components/MoneyInput";
 import Select, { type SelectOption } from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
+import DateField from "@/components/DateField";
 
 export type CategoryOption = SelectOption & { type: "INCOME" | "EXPENSE" };
 
@@ -91,12 +92,7 @@ export default function TransactionForm({
       {defaults?.date !== undefined && (
         <div>
           <label className="block text-xs font-semibold text-inksoft mb-1.5">Date</label>
-          <input
-            type="date"
-            name="date"
-            defaultValue={defaults.date}
-            className="w-full rounded-md border border-line bg-card px-3 py-3 text-sm"
-          />
+          <DateField name="date" defaultValue={defaults.date} title="Transaction date" />
         </div>
       )}
 

@@ -21,6 +21,7 @@ import { DebtCurve } from "@/components/Charts";
 import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
+import DateField from "@/components/DateField";
 
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
 
@@ -568,27 +569,22 @@ async function HistoryTab({ userId, spaceId, money, sp }: Ctx & { sp: Search }) 
               {label}
             </Link>
           ))}
-          <details className="relative">
-            <summary
-              className={`px-3 py-1.5 rounded-full text-[11px] font-bold cursor-pointer list-none ${range === "custom" ? "bg-goodbg text-sagedeep" : "text-inksoft border border-line"}`}
-            >
-              Custom
-            </summary>
-            <form
-              method="GET"
-              action="/money"
-              className="absolute z-30 mt-1.5 bg-card border border-line rounded-md p-3 flex flex-col gap-2 shadow-soft w-52"
-            >
+          <Popover
+            trigger="Custom"
+            triggerClass={`px-3 py-1.5 rounded-full text-[11px] font-bold ${range === "custom" ? "bg-goodbg text-sagedeep" : "text-inksoft border border-line"}`}
+            width="w-56"
+          >
+            <form method="GET" action="/money" className="flex flex-col gap-2">
               <input type="hidden" name="tab" value="history" />
               <input type="hidden" name="range" value="custom" />
               <input type="hidden" name="kind" value={kind.toLowerCase()} />
-              <input type="date" name="from" required className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-xs" />
-              <input type="date" name="to" required className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-xs" />
+              <DateField name="from" required placeholder="From" title="From date" className="!py-2 text-xs" />
+              <DateField name="to" required placeholder="To" title="To date" className="!py-2 text-xs" />
               <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-1.5">
                 Apply
               </button>
             </form>
-          </details>
+          </Popover>
         </div>
         <CategoryPie
           data={pieData}
@@ -733,11 +729,7 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-inksoft mb-1">First payment month</label>
-            <input
-              type="month"
-              name="start"
-              className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
-            />
+            <DateField name="start" mode="month" placeholder="Pick a month" title="First payment month" />
           </div>
           <SubmitButton
             className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"

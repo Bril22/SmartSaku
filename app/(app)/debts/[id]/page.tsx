@@ -17,6 +17,7 @@ import {
 import MoneyInput from "@/components/MoneyInput";
 import PayForm from "@/components/PayForm";
 import Popover from "@/components/Popover";
+import DateField from "@/components/DateField";
 
 export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { userId, spaceId } = await requireSpace();
@@ -225,28 +226,23 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         <summary className="text-xs font-bold text-sagedeep cursor-pointer">
           + Add a month to the schedule
         </summary>
-        <form action={addScheduleEntry} className="bg-card border border-line rounded-md p-3.5 mt-2 flex gap-2 items-end">
+        <form action={addScheduleEntry} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-3">
           <input type="hidden" name="debtId" value={debt.id} />
-          <div className="flex-1">
+          <div>
             <label className="block text-[11px] font-semibold text-inksoft mb-1">Month</label>
-            <input
-              type="month"
-              name="month"
-              required
-              className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
-            />
+            <DateField name="month" mode="month" required title="Which month" />
           </div>
-          <div className="flex-1">
+          <div>
             <label className="block text-[11px] font-semibold text-inksoft mb-1">Amount</label>
             <MoneyInput
               name="planned"
               required
               placeholder="1,100,000"
-              className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              className="w-full rounded-md border border-line bg-cream2 px-3.5 py-3 text-sm text-right money"
             />
           </div>
-          <button className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-4 py-2.5 shrink-0">
-            Add
+          <button className="w-full bg-sagedeep text-cream2 rounded-full text-xs font-extrabold py-2.5">
+            Add to schedule
           </button>
         </form>
       </details>

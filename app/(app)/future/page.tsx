@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
-import { getDebtSummaries, projectFuture } from "@/lib/finance";
+import { getDebtSummaries, getForecastBasis, projectFuture } from "@/lib/finance";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
-import { updateSettings } from "@/app/actions";
+import { clearAssumptions, updateSettings } from "@/app/actions";
 import {
   addGoal,
   askGoalAdvice,
@@ -18,6 +18,7 @@ import MoneyInput from "@/components/MoneyInput";
 import Popover from "@/components/Popover";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
+import DateField from "@/components/DateField";
 
 export default async function FuturePage({
   searchParams,
@@ -39,7 +40,7 @@ export default async function FuturePage({
   }
   const horizonYears = Math.max(years, Math.ceil((lookupMonths + 1) / 12));
 
-  const [settings, points, money, debts, goals, accounts, planned] = await Promise.all([
+  const [settings, points, money, debts, goals, accounts, planned, basis] = await Promise.all([
     prisma.settings.findUnique({ where: { userId } }),
     projectFuture(userId, spaceId, horizonYears),
     getMoney(userId),
@@ -54,6 +55,7 @@ export default async function FuturePage({
       orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     }),
     prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
+    getForecastBasis(userId, spaceId),
   ]);
   const chartPoints = points.slice(0, years * 12);
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));
@@ -142,13 +144,7 @@ export default async function FuturePage({
             <label className="block text-[11px] font-semibold text-inksoft mb-1">
               🔮 Check a specific date
             </label>
-            <input
-              type="date"
-              name="on"
-              defaultValue={on ?? ""}
-              required
-              className="rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
-            />
+            <DateField name="on" defaultValue={on ?? ""} required title="Check a specific date" />
           </div>
           <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-5 py-2.5">
             Look ahead
@@ -209,26 +205,78 @@ export default async function FuturePage({
         <FutureChart data={chartPoints} code={money.code} ratePerIdr={money.ratePerIdr} symbol={money.symbol} />
       </div>
 
-      <details className="bg-card border border-line rounded-lg p-4" open>
-        <summary className="text-sm font-bold cursor-pointer">Assumptions (income, living, growth)</summary>
-        <form action={updateSettings} className="mt-3 space-y-3">
-          <Field label="Monthly income (Rp)" name="monthlyIncome" value={Number(settings?.monthlyIncome ?? 0)} money />
+      <div className="bg-card border border-line rounded-lg p-4">
+        <h2 className="text-sm font-bold">Assumptions</h2>
+        <p className="text-[11.5px] text-inksoft mt-1 mb-3 leading-relaxed">
+          Fill a field to tell the forecast what to use. Leave it empty to follow your plan and
+          debts instead.
+        </p>
+
+        <div className="rounded-md bg-cream2 border border-line p-3 mb-3 space-y-1.5">
+          <BasisRow
+            label="Income / month"
+            amount={basis.income}
+            fromPlan={basis.incomeFromPlan}
+            money={money}
+          />
+          <BasisRow
+            label="Expenses / month"
+            amount={basis.expense}
+            fromPlan={basis.expenseFromPlan}
+            money={money}
+          />
+          {basis.debtThisMonth > 0 && (
+            <div className="flex items-baseline gap-2 text-[12px]">
+              <span className="flex-1 text-inksoft">Debt / month</span>
+              <span className="font-bold money">{money.rp(basis.debtThisMonth)}</span>
+              <span className="text-[10px] font-bold text-sagedeep bg-goodbg rounded-full px-2 py-0.5">
+                schedule
+              </span>
+            </div>
+          )}
+        </div>
+
+        <form action={updateSettings} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Rent / month" name="livingRent" value={Number(settings?.livingRent ?? 0)} money />
-            <Field label="Food / month" name="livingFood" value={Number(settings?.livingFood ?? 0)} money />
-            <Field label="Family / month" name="livingFamily" value={Number(settings?.livingFamily ?? 0)} money />
-            <Field label="Other / month" name="livingOther" value={Number(settings?.livingOther ?? 0)} money />
+            <Field
+              label="Monthly income"
+              name="monthlyIncome"
+              value={Number(settings?.monthlyIncome ?? 0)}
+              hint={basis.incomeFromPlan ? `Plan: ${money.rpShort(basis.planIncome)}` : undefined}
+              money
+            />
+            <Field
+              label="Monthly expense"
+              name="monthlyExpense"
+              value={Number(settings?.monthlyExpense ?? 0)}
+              hint={basis.expenseFromPlan ? `Plan: ${money.rpShort(basis.planExpense)}` : undefined}
+              money
+            />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Salary growth %/yr" name="salaryGrowthPct" value={settings?.salaryGrowthPct ?? 5} step="0.5" />
-            <Field label="Inflation %/yr" name="inflationPct" value={settings?.inflationPct ?? 3} step="0.5" />
-            <Field label="Savings rate %/yr" name="savingsRatePct" value={settings?.savingsRatePct ?? 2} step="0.5" />
+          <div className="grid grid-cols-3 gap-2.5 items-end">
+            <Field label="Salary growth" name="salaryGrowthPct" value={settings?.salaryGrowthPct ?? 5} step="0.5" suffix="%/yr" />
+            <Field label="Inflation" name="inflationPct" value={settings?.inflationPct ?? 3} step="0.5" suffix="%/yr" />
+            <Field label="Savings rate" name="savingsRatePct" value={settings?.savingsRatePct ?? 2} step="0.5" suffix="%/yr" />
           </div>
-          <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-5 py-2.5">
-            Save & recalculate
-          </button>
+          <SubmitButton
+            className="w-full sm:w-auto rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+            pendingText="Recalculating…"
+          >
+            Save &amp; recalculate
+          </SubmitButton>
         </form>
-      </details>
+
+        {(!basis.incomeFromPlan || !basis.expenseFromPlan) && (
+          <form action={clearAssumptions} className="mt-2.5 pt-2.5 border-t border-line">
+            <SubmitButton
+              className="text-[11.5px] font-extrabold text-inksoft"
+              pendingText="Clearing…"
+            >
+              Clear and follow my plan instead
+            </SubmitButton>
+          </form>
+        )}
+      </div>
       </div>
 
       {/* goals */}
@@ -292,11 +340,11 @@ export default async function FuturePage({
                         defaultValue={target}
                         className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
                       />
-                      <input
-                        type="date"
+                      <DateField
                         name="targetDate"
                         defaultValue={g.targetDate ? g.targetDate.toISOString().slice(0, 10) : ""}
-                        className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm"
+                        placeholder="Target date (optional)"
+                        title="Target date"
                       />
                       <button className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2">
                         Save goal
@@ -428,11 +476,9 @@ export default async function FuturePage({
                   className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
                 />
               </div>
-              <input
-                type="date"
-                name="targetDate"
-                className="rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
-              />
+              <div className="w-44 shrink-0">
+                <DateField name="targetDate" placeholder="Target date" title="Target date" />
+              </div>
             </div>
             <SubmitButton
               className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
@@ -447,28 +493,68 @@ export default async function FuturePage({
   );
 }
 
+function BasisRow({
+  label,
+  amount,
+  fromPlan,
+  money,
+}: {
+  label: string;
+  amount: number;
+  fromPlan: boolean;
+  money: { rp: (n: number) => string };
+}) {
+  return (
+    <div className="flex items-baseline gap-2 text-[12px]">
+      <span className="flex-1 text-inksoft">{label}</span>
+      <span className="font-bold money">{money.rp(amount)}</span>
+      <span
+        className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${
+          fromPlan ? "text-sagedeep bg-goodbg" : "text-earth bg-warnbg"
+        }`}
+      >
+        {fromPlan ? "plan" : "yours"}
+      </span>
+    </div>
+  );
+}
+
 function Field({
   label,
   name,
   value,
   step,
   money,
+  hint,
+  suffix,
 }: {
   label: string;
   name: string;
   value: number;
   step?: string;
   money?: boolean;
+  hint?: string;
+  suffix?: string;
 }) {
   const className = "w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money";
   return (
-    <div>
-      <label className="block text-[11px] font-semibold text-inksoft mb-1">{label}</label>
+    <div className="min-w-0 flex flex-col justify-end">
+      <label className="block text-[11px] font-semibold text-inksoft mb-1 leading-tight">
+        {label}
+        {suffix && <span className="text-inksoft/70"> {suffix}</span>}
+      </label>
       {money ? (
-        <MoneyInput name={name} defaultValue={value} className={className} />
+        <MoneyInput
+          key={`${name}-${value}`}
+          name={name}
+          defaultValue={value || undefined}
+          placeholder="—"
+          className={className}
+        />
       ) : (
-        <input name={name} type="number" step={step ?? "1"} defaultValue={value} className={className} />
+        <input key={`${name}-${value}`} name={name} type="number" step={step ?? "1"} defaultValue={value} className={className} />
       )}
+      {hint && <div className="text-[10px] text-inksoft mt-1 truncate">{hint}</div>}
     </div>
   );
 }

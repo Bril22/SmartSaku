@@ -31,10 +31,7 @@ async function main() {
     data: {
       userId: user.id,
       monthlyIncome: 15_000_000n,
-      livingRent: 2_500_000n,
-      livingFood: 1_800_000n,
-      livingFamily: 1_500_000n,
-      livingOther: 700_000n,
+      monthlyExpense: 6_500_000n,
       salaryGrowthPct: 5,
       inflationPct: 3,
       savingsRatePct: 3,

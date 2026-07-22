@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { confirmImport } from "@/app/import/actions";
 import type { ImportRow } from "@/lib/importer";
+import DateField from "@/components/DateField";
 
 type PreviewRow = ImportRow & { include: boolean; accountName: string; categoryName: string };
 
@@ -90,12 +91,15 @@ export default function ImportPreview({
                 onChange={(e) => update(i, { include: e.target.checked })}
                 className="w-4 h-4 accent-sagedeep shrink-0"
               />
-              <input
-                type="date"
-                value={r.date}
-                onChange={(e) => update(i, { date: e.target.value })}
-                className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-xs"
-              />
+              <div className="w-36 shrink-0">
+                <DateField
+                  name={`date-${i}`}
+                  value={r.date}
+                  onChange={(v) => update(i, { date: v })}
+                  title="Transaction date"
+                  className="!px-2.5 !py-2 text-xs"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => update(i, { direction: r.direction === "IN" ? "OUT" : "IN" })}
