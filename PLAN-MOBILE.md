@@ -22,6 +22,7 @@ The research changed my mind about the strategy, so the headline first.
 
 | Route | Verdict |
 |---|---|
+| Your own licence | Account information services need a **BI PJP Category 2 licence with Rp5.000.000.000 paid-up capital**. Brankas was the *first* company in Indonesia to get one, in April 2024. |
 | Aggregator API (Brick, Ayoconnect) | Both pivoted to business payments. No consumer aggregation. |
 | Finantier | Shut down September 2023. |
 | Brankas | The only one left. Contact-sales, needs a PT, no self-serve tier. |
@@ -29,12 +30,18 @@ The research changed my mind about the strategy, so the headline first.
 | Reading SMS | Google Play permits `READ_SMS` only for default SMS/phone/assistant handlers. Expense tracking does not qualify. |
 | **Android notification listener** | **Viable.** `BIND_NOTIFICATION_LISTENER_SERVICE`, user-granted, no declaration form. A shipping app (Radar Duit) already parses 13+ Indonesian banks and wallets this way. Android only, needs a native shell. |
 | **QRIS QR parsing** | **Viable and unclaimed.** The QR payload is EMVCo TLV — tag 59 is the merchant name, 52 the category, 54 the amount. Parseable on-device with no permission, no API and no licence. Nobody does this. |
+| **E-statement import** | **Viable, and it is what the local competition actually does.** Sribuu's current bank-linking page is a manual e-statement upload. Finku leads with statement and receipt scanning. Neither runs live aggregation. Skipping it is not falling behind — it is matching the market. |
+
+**Build note:** Indonesian bank e-statement PDFs are usually password-protected, and the password is
+commonly the account holder's date of birth as `ddmmyyyy`. The importer must accept one.
 
 ### Regulation — you are clear, with two duties
 
 - **No OJK licence.** A manual tracker is outside POJK 3/2024's scope, and the ITSK regime requires a legal entity anyway, so it excludes individuals by design.
 - **PSE registration with Komdigi is required**, and individuals can do it through OSS. The penalty for skipping it is your app being blocked, and this is actively enforced — Wikipedia was blocked in April 2026 until it registered.
-- **PDP Law applies.** Financial data counts as *specific* personal data, so a written impact assessment is mandatory and breaches must be reported within 3×24 hours. The supervisory body does not exist yet (targeted around September 2026), but the criminal provisions are already live.
+- **PDP Law applies.** Financial data counts as *specific* personal data, so a written impact assessment is mandatory and breaches must be reported within 3×24 hours. The supervisory body still does not exist, so administrative fines cannot currently be issued — but the criminal provisions are live, and Law No. 1 of 2026 cut those fines sharply (Rp5 miliar to Rp200 juta for unlawful collection).
+- **You can host on Neon and Vercel.** There is no general data-residency rule for a private app; localisation binds public operators and licensed financial institutions. Cross-border transfer needs explicit separate consent naming the countries and providers, plus the standard processing agreements those vendors already offer.
+- **Data subject requests carry a 72-hour deadline**, which means export, delete and withdraw-consent have to be self-service. That happens to be the same work as the store account-deletion requirement.
 - **The line not to cross:** the moment the app lists, compares or refers third-party financial products, it may become a *Penyelenggara Agregasi Jasa Keuangan* under POJK 4/2025 — OJK licence, PT, and Rp 500,000,000 paid-up capital. So no "compare loans", no lender affiliate links, ever.
 - **Tax:** the 0.5% final UMKM rate is now permanent for individuals, and the first Rp 500 million of turnover is untaxed. A PT Perorangan (Rp 50.000 to register) gets the *same* tax treatment — form one for limited liability, not for tax.
 
@@ -54,9 +61,15 @@ The fee maths on a small ticket is brutal and drives the whole pricing design:
 
 Also: **Google Play cannot bill a subscription to QRIS, cash or a virtual account** — only cards, carrier billing and e-wallets. And 31% of Play subscription cancellations are involuntary billing failures.
 
-### The launch blocker nobody mentions
+### Three things to decide before the first submission
 
-Google Play personal developer accounts created after November 2023 must run a closed test with **12 testers opted in for 14 continuous days** before production access. That is a calendar constraint, not an engineering one. Start recruiting on day one.
+1. **Google Play account type is irreversible.** A personal account **cannot** be converted to an organization account later. If bank linking is ever on the roadmap — which needs a company anyway — open an **organization** account now. Apple has the same shape of problem: guideline 5.1.1(ix) says apps in banking and financial services should be submitted by a legal entity rather than an individual. A manual tracker is fine as an individual today; the day it connects to a bank, expect that rule to be enforced.
+2. **Account deletion must exist before you submit.** Apple has required in-app deletion since June 2022, and Google requires **both** an in-app path **and** a public web page that works without logging in. This is a common, entirely avoidable rejection.
+3. **Apply to Apple's Small Business Program.** It is 15% from day one instead of 30% for the first year, but enrolment is **not automatic** — you have to apply, and the rate starts after approval.
+
+And the calendar blocker: Google Play personal accounts created after November 2023 must run a closed test with **12 testers opted in for 14 continuous days**. Budget about three extra weeks and start recruiting now.
+
+One piece of good news on fees: Google's June 2026 fee restructure does not reach Indonesia until **30 September 2027**, so nothing changes for you in the near term.
 
 ---
 
@@ -125,7 +138,9 @@ From the audit in [AUDIT.md](AUDIT.md). None of this is optional once strangers'
 
 28. Per-transaction multi-currency (today only the display converts).
 29. Asset and liability accounts: property, vehicle, gold, receivables.
-30. **Investments read-only**: Indodax gives free IDR crypto prices with no key at 180 requests/minute. Stocks via CoinGecko/manual. Never execute a trade.
+30. **Investments read-only**: Indodax gives free IDR crypto prices with no key. Never execute a trade, never hold coins — both need a PAKD licence.
+    **Important design correction:** Indonesian crypto tax under PMK 50/2025 is **final and charged on the gross sale value, not the profit** — 0,21% through a domestic exchange, 1% through a foreign one, and VAT on the asset itself was removed. So never present "realised gain" as a tax base. Showing the estimated 0,21% on a sale is a genuine differentiator nobody offers.
+    Indonesian mutual fund (reksa dana) NAV has **no free daily feed** — manual entry only. IDX end-of-day prices need a paid provider (~$10–20/month); Yahoo works but has no commercial licence.
 31. **Zakat**: a precise, citable spec (2,5%, nisab = 85g gold, Rp 91.681.728 for 2026 by BAZNAS decree). 64% of payers already give digitally. The only competitor has 50 downloads. Note that murabahah debt has no interest to save, so the payoff engine needs a debt-type flag.
 32. **Tax estimate only** — PPh 21 brackets and PTKP, clearly marked as an estimate. Preparing figures is fine; advising is not.
 
