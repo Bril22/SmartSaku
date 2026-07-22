@@ -420,7 +420,7 @@ export default async function FuturePage({
                       triggerClass="text-inksoft text-[11px] font-bold px-1 py-2"
                       width="w-60"
                     >
-                      {g.contributions.map((c) => (
+                      {g.contributions.slice(0, 5).map((c) => (
                         <div key={c.id} className="flex items-center gap-2 text-[12px] border-t border-line pt-2 first:border-0 first:pt-0">
                           <span className="flex-1">
                             {c.createdAt.toLocaleDateString("en-US", { day: "numeric", month: "short" })}
@@ -434,6 +434,11 @@ export default async function FuturePage({
                           </form>
                         </div>
                       ))}
+                      {g.contributions.length > 5 && (
+                        <p className="text-[10.5px] text-inksoft pt-2 border-t border-line">
+                          Showing the 5 most recent of {g.contributions.length} deposits.
+                        </p>
+                      )}
                     </Popover>
                   )}
                 </div>

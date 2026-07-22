@@ -240,10 +240,7 @@ export async function askGoalAdvice(formData: FormData) {
   }
   if (!advice) back("Saku AI could not answer right now — try again", true);
 
-  await prisma.$transaction([
-    prisma.goal.update({ where: { id }, data: { advice, advisedAt: new Date() } }),
-    prisma.goalMessage.create({ data: { goalId: id, role: "AI", text: advice } }),
-  ]);
+  await prisma.goalMessage.create({ data: { goalId: id, role: "AI", text: advice } });
   revalidatePath(BACK);
   back("Saku-Kun has advice for you 🌱");
 }
@@ -298,10 +295,7 @@ export async function clearGoalChat(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const goal = await prisma.goal.findFirst({ where: { id, spaceId } });
   if (!goal) back("Goal not found", true);
-  await prisma.$transaction([
-    prisma.goalMessage.deleteMany({ where: { goalId: id } }),
-    prisma.goal.update({ where: { id }, data: { advice: "", advisedAt: null } }),
-  ]);
+  await prisma.goalMessage.deleteMany({ where: { goalId: id } });
   revalidatePath(BACK);
   back("Chat cleared");
 }

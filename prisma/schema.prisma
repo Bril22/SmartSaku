@@ -21,7 +21,6 @@ model User {
   transactions Transaction[]
   bills        RecurringBill[]
   planned      PlannedTransaction[]
-  snapshots    MonthlySnapshot[]
   settings     Settings?
   imports      ImportBatch[]
   goals        Goal[]
@@ -276,8 +275,6 @@ model Goal {
   targetAmount BigInt
   targetDate   DateTime? @db.Date
   note         String    @default("")
-  advice       String    @default("")
-  advisedAt    DateTime?
   createdAt    DateTime  @default(now())
 
   contributions GoalContribution[]
@@ -293,17 +290,6 @@ model GoalContribution {
   createdAt     DateTime @default(now())
 }
 
-model MonthlySnapshot {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  month          DateTime @db.Date
-  totalSavings   BigInt
-  totalDebt      BigInt
-  incomeReceived BigInt
-
-  @@unique([userId, month])
-}
 
 model ExchangeRate {
   code       String   @id
