@@ -227,7 +227,7 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
               <MoneyInput
                 name="amount"
                 required
-                placeholder="5,000,000"
+                placeholder="5.000.000,00"
                 className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
               />
             </div>
@@ -713,7 +713,7 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
               <MoneyInput
                 name="total"
                 required
-                placeholder="12,000,000"
+                placeholder="12.000.000,00"
                 className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
               />
             </div>
@@ -722,7 +722,7 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
               <MoneyInput
                 name="monthly"
                 required
-                placeholder="1,000,000"
+                placeholder="1.000.000,00"
                 className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
               />
             </div>

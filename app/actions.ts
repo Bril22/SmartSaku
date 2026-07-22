@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { ensurePersonalSpace, requireSpace } from "@/lib/space";
 import { createSession, destroySession, getSessionUserId } from "@/lib/auth";
-import { monthKey } from "@/lib/format";
+import { formatMinor, monthKey } from "@/lib/format";
 
 
 
@@ -569,7 +569,7 @@ export async function updateDebtPayment(formData: FormData) {
     redirect(
       `${backTo}?err=` +
         encodeURIComponent(
-          `Too much — other payments already cover part of this month (max ${overCap.toLocaleString("en-US")})`,
+          `Too much — other payments already cover part of this month (max ${formatMinor(overCap)})`,
         ),
     );
   }

@@ -79,13 +79,13 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         <form action={adjustDebt} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2">
           <input type="hidden" name="debtId" value={debt.id} />
           <label className="block text-xs text-inksoft">
-            Amount in Rp. Positive = debt increased, negative = debt decreased (e.g. -500,000).
+            Amount in Rp. Positive = debt increased, negative = debt decreased (e.g. -500.000).
           </label>
           <MoneyInput
             name="delta"
             required
             allowNegative
-            placeholder="-500,000"
+            placeholder="-500.000,00"
             className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
           />
           <input
@@ -237,7 +237,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
             <MoneyInput
               name="planned"
               required
-              placeholder="1,100,000"
+              placeholder="1.100.000,00"
               className="w-full rounded-md border border-line bg-cream2 px-3.5 py-3 text-sm text-right money"
             />
           </div>

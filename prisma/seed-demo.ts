@@ -30,8 +30,8 @@ async function main() {
   await prisma.settings.create({
     data: {
       userId: user.id,
-      monthlyIncome: 15_000_000n,
-      monthlyExpense: 6_500_000n,
+      monthlyIncome: 15_000_000_00n,
+      monthlyExpense: 6_500_000_00n,
       salaryGrowthPct: 5,
       inflationPct: 3,
       savingsRatePct: 3,
@@ -39,12 +39,12 @@ async function main() {
   });
 
   const bank = await prisma.finAccount.create({
-    data: { userId: user.id, name: "BCA", type: "BANK", balance: 6_750_000n },
+    data: { userId: user.id, name: "BCA", type: "BANK", balance: 6_750_000_00n },
   });
   await prisma.finAccount.createMany({
     data: [
-      { userId: user.id, name: "Tabungan", type: "SAVINGS", balance: 4_200_000n },
-      { userId: user.id, name: "GoPay", type: "EWALLET", balance: 350_000n },
+      { userId: user.id, name: "Tabungan", type: "SAVINGS", balance: 4_200_000_00n },
+      { userId: user.id, name: "GoPay", type: "EWALLET", balance: 350_000_00n },
     ],
   });
 
@@ -64,9 +64,9 @@ async function main() {
 
   await prisma.plannedTransaction.createMany({
     data: [
-      { userId: user.id, name: "Gaji bulanan", amount: 15_000_000n, direction: "IN", dayOfMonth: 1, categoryId: catIds.Salary },
-      { userId: user.id, name: "Kos/Rent", amount: 2_500_000n, direction: "OUT", dayOfMonth: 28, categoryId: catIds.Rent },
-      { userId: user.id, name: "Internet", amount: 350_000n, direction: "OUT", dayOfMonth: 5, categoryId: catIds.Fun },
+      { userId: user.id, name: "Gaji bulanan", amount: 15_000_000_00n, direction: "IN", dayOfMonth: 1, categoryId: catIds.Salary },
+      { userId: user.id, name: "Kos/Rent", amount: 2_500_000_00n, direction: "OUT", dayOfMonth: 28, categoryId: catIds.Rent },
+      { userId: user.id, name: "Internet", amount: 350_000_00n, direction: "OUT", dayOfMonth: 5, categoryId: catIds.Fun },
     ],
   });
 
@@ -81,13 +81,13 @@ async function main() {
       data: { userId: user.id, lender: d.lender, color: d.color },
     });
     await prisma.debtScheduleEntry.createMany({
-      data: d.schedule.map((amt, i) => ({ debtId: debt.id, month: monthDate(i), planned: BigInt(amt) })),
+      data: d.schedule.map((amt, i) => ({ debtId: debt.id, month: monthDate(i), planned: BigInt(amt) * 100n })),
     });
     // Cicilan HP: 2 of 3 already paid → shows progress; PayNanti: July paid
     const paidMonths = d.lender === "Cicilan HP" ? [0, 1] : d.lender === "PayNanti" ? [0] : [];
     for (const i of paidMonths) {
       await prisma.debtPayment.create({
-        data: { debtId: debt.id, month: monthDate(i), amount: BigInt(d.schedule[i]), status: "PAID" },
+        data: { debtId: debt.id, month: monthDate(i), amount: BigInt(d.schedule[i]) * 100n, status: "PAID" },
       });
     }
   }
@@ -107,7 +107,7 @@ async function main() {
         userId: user.id,
         accountId: bank.id,
         categoryId: catIds[t.cat],
-        amount: BigInt(t.amount),
+        amount: BigInt(t.amount) * 100n,
         direction: t.direction,
         note: t.note,
         date: new Date(Date.UTC(2026, 6, t.day, 8)),

@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { confirmImport } from "@/app/import/actions";
 import type { ImportRow } from "@/lib/importer";
 import DateField from "@/components/DateField";
+import { formatMinor, parseMinor } from "@/lib/format";
 
 type PreviewRow = ImportRow & { include: boolean; accountName: string; categoryName: string };
 
@@ -61,11 +62,11 @@ export default function ImportPreview({
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Income found</div>
-          <div className="font-extrabold text-sagedeep money">+Rp{totalIn.toLocaleString("en-US")}</div>
+          <div className="font-extrabold text-sagedeep money">+Rp{formatMinor(totalIn)}</div>
         </div>
         <div className="bg-card border border-line rounded-md p-3">
           <div className="text-[10px] uppercase tracking-wide text-inksoft">Expenses found</div>
-          <div className="font-extrabold text-peachdeep money">−Rp{totalOut.toLocaleString("en-US")}</div>
+          <div className="font-extrabold text-peachdeep money">−Rp{formatMinor(totalOut)}</div>
         </div>
       </div>
 
@@ -110,12 +111,9 @@ export default function ImportPreview({
                 {r.direction === "IN" ? "Income" : "Expense"}
               </button>
               <input
-                inputMode="numeric"
-                value={r.amount.toLocaleString("en-US")}
-                onChange={(e) => {
-                  const n = Number(e.target.value.replace(/[^0-9]/g, ""));
-                  update(i, { amount: n });
-                }}
+                inputMode="decimal"
+                value={formatMinor(r.amount)}
+                onChange={(e) => update(i, { amount: parseMinor(e.target.value) })}
                 className="flex-1 min-w-0 rounded-md border border-line bg-cream2 px-2 py-1.5 text-xs text-right money font-bold"
               />
             </div>

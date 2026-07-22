@@ -9,28 +9,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { MINOR, formatMinor, group } from "@/lib/format";
 
 type CurrencyProps = { code?: string; ratePerIdr?: number; symbol?: string };
 
 function makeFmt({ code = "IDR", ratePerIdr = 1, symbol = "Rp" }: CurrencyProps) {
-  const short = (idr: number) => {
-    const v = idr * ratePerIdr;
-    if (code === "IDR") {
-      if (Math.abs(v) >= 1_000_000_000) return (v / 1_000_000_000).toFixed(1) + "M";
-      if (Math.abs(v) >= 1_000_000) return (v / 1_000_000).toFixed(0) + "jt";
-      return String(Math.round(v));
-    }
-    return v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
+  const short = (minor: number) => {
+    const v = (minor * ratePerIdr) / MINOR;
+    if (Math.abs(v) >= 1_000_000_000) return group(v / 1_000_000_000, 1) + (code === "IDR" ? "M" : "B");
+    if (Math.abs(v) >= 1_000_000) return group(v / 1_000_000, 0) + (code === "IDR" ? "jt" : "M");
+    if (Math.abs(v) >= 1_000) return group(v / 1_000, 0) + "rb";
+    return group(v, 0);
   };
-  const full = (idr: number) => {
-    const v = idr * ratePerIdr;
-    return (
-      symbol +
-      v.toLocaleString("en-US", {
-        maximumFractionDigits: code === "IDR" || code === "JPY" ? 0 : 2,
-      })
-    );
-  };
+  const full = (minor: number) => symbol + formatMinor(minor * ratePerIdr);
   return { short, full };
 }
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { shortMinor } from "@/lib/format";
 
 export type CalTx = {
   id: string;
@@ -45,13 +46,7 @@ export default function CalendarHistory({
   const dayTxs = byDay.get(selected) ?? [];
 
   const fmt = (idr: number) => {
-    const v = idr * fmtShort.ratePerIdr;
-    if (fmtShort.code === "IDR") {
-      if (Math.abs(v) >= 1_000_000) return "Rp" + (v / 1_000_000).toFixed(1) + "jt";
-      if (Math.abs(v) >= 1_000) return "Rp" + (v / 1_000).toFixed(0) + "rb";
-      return "Rp" + Math.round(v);
-    }
-    return fmtShort.symbol + v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
+    return shortMinor(idr * fmtShort.ratePerIdr, fmtShort.symbol);
   };
 
   return (

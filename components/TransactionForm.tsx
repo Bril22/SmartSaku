@@ -84,7 +84,7 @@ export default function TransactionForm({
           name="amount"
           required
           defaultValue={defaults?.amount}
-          placeholder="85,000"
+          placeholder="85.000,00"
           className="w-full rounded-md border border-line bg-card px-4 py-4 text-2xl font-display font-bold text-center money focus:outline-none focus:border-sagedeep"
         />
       </div>

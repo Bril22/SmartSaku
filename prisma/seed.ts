@@ -62,8 +62,8 @@ async function main() {
     where: { userId: user.id },
     create: {
       userId: user.id,
-      monthlyIncome: 27_500_000n,
-      monthlyExpense: 10_000_000n,
+      monthlyIncome: 27_500_000_00n,
+      monthlyExpense: 10_000_000_00n,
       salaryGrowthPct: 5,
       inflationPct: 3,
       savingsRatePct: 2,
@@ -76,7 +76,7 @@ async function main() {
   if (accountCount === 0) {
     await prisma.finAccount.createMany({
       data: [
-        { userId: user.id, spaceId, name: "Bank (main)", type: "BANK", balance: 12_000_000n },
+        { userId: user.id, spaceId, name: "Bank (main)", type: "BANK", balance: 12_000_000_00n },
         { userId: user.id, spaceId, name: "Savings", type: "SAVINGS", balance: 0n },
       ],
     });
@@ -109,9 +109,9 @@ async function main() {
     const salaryCat = await prisma.category.findFirst({ where: { spaceId, name: "Salary" } });
     await prisma.plannedTransaction.createMany({
       data: [
-        { userId: user.id, spaceId, name: "Salary", amount: 27_500_000n, direction: "IN", dayOfMonth: 1, categoryId: salaryCat?.id },
-        { userId: user.id, spaceId, name: "Rent", amount: 4_000_000n, direction: "OUT", dayOfMonth: 28, categoryId: rentCat?.id },
-        { userId: user.id, spaceId, name: "Family support", amount: 3_000_000n, direction: "OUT", dayOfMonth: 1, categoryId: famCat?.id },
+        { userId: user.id, spaceId, name: "Salary", amount: 27_500_000_00n, direction: "IN", dayOfMonth: 1, categoryId: salaryCat?.id },
+        { userId: user.id, spaceId, name: "Rent", amount: 4_000_000_00n, direction: "OUT", dayOfMonth: 28, categoryId: rentCat?.id },
+        { userId: user.id, spaceId, name: "Family support", amount: 3_000_000_00n, direction: "OUT", dayOfMonth: 1, categoryId: famCat?.id },
       ],
     });
   }
@@ -127,7 +127,7 @@ async function main() {
     if (existing === 0) {
       const rows = [];
       for (let i = 0; i < Math.min(arr.length, HORIZON); i++) {
-        if (arr[i] > 0) rows.push({ debtId: debt.id, month: monthDate(i), planned: BigInt(arr[i]) });
+        if (arr[i] > 0) rows.push({ debtId: debt.id, month: monthDate(i), planned: BigInt(arr[i]) * 100n });
       }
       await prisma.debtScheduleEntry.createMany({ data: rows });
       console.log(`Debt ${lender}: ${rows.length} scheduled payments`);

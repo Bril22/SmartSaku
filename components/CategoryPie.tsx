@@ -1,6 +1,7 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { formatMinor } from "@/lib/format";
 
 export type PieSlice = { name: string; value: number; icon?: string };
 
@@ -34,13 +35,7 @@ export default function CategoryPie({
   if (total <= 0) {
     return <div className="text-sm text-inksoft text-center py-8">{emptyText}</div>;
   }
-  const fmt = (idr: number) => {
-    const v = idr * ratePerIdr;
-    return (
-      symbol +
-      v.toLocaleString("en-US", { maximumFractionDigits: code === "IDR" || code === "JPY" ? 0 : 2 })
-    );
-  };
+  const fmt = (minor: number) => symbol + formatMinor(minor * ratePerIdr);
 
   return (
     <div className="flex flex-col sm:flex-row items-center gap-2">

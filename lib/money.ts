@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { MINOR, formatMinor, group } from "./format";
 
 export const CURRENCIES: Record<string, { symbol: string; decimals: number; label: string }> = {
   IDR: { symbol: "Rp", decimals: 0, label: "Indonesian Rupiah" },
@@ -14,8 +15,8 @@ export type Money = {
   ratePerIdr: number;
   symbol: string;
   stale: boolean;
-  rp: (idr: number | bigint) => string;
-  rpShort: (idr: number | bigint) => string;
+  rp: (minorIdr: number | bigint) => string;
+  rpShort: (minorIdr: number | bigint) => string;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -63,29 +64,17 @@ export async function getMoney(userId: string): Promise<Money> {
 }
 
 export function makeMoney(code: string, ratePerIdr: number, stale: boolean): Money {
-  const { symbol, decimals } = CURRENCIES[code];
-  const rp = (idr: number | bigint) => {
-    const v = Number(idr) * ratePerIdr;
-    return (
-      symbol +
-      v.toLocaleString("en-US", {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: decimals,
-      })
-    );
-  };
-  const rpShort = (idr: number | bigint) => {
-    const v = Number(idr) * ratePerIdr;
+  const { symbol } = CURRENCIES[code];
+  const rp = (minorIdr: number | bigint) => symbol + formatMinor(Number(minorIdr) * ratePerIdr);
+  const rpShort = (minorIdr: number | bigint) => {
+    const v = (Number(minorIdr) * ratePerIdr) / MINOR;
     if (code === "IDR") {
-      if (Math.abs(v) >= 1_000_000_000) return "Rp" + (v / 1_000_000_000).toFixed(2) + "M";
-      if (Math.abs(v) >= 1_000_000) return "Rp" + (v / 1_000_000).toFixed(1) + "jt";
-      if (Math.abs(v) >= 1_000) return "Rp" + (v / 1_000).toFixed(0) + "rb";
-      return "Rp" + v.toFixed(0);
+      if (Math.abs(v) >= 1_000_000_000) return "Rp" + group(v / 1_000_000_000, 2) + "M";
+      if (Math.abs(v) >= 1_000_000) return "Rp" + group(v / 1_000_000, 1) + "jt";
+      if (Math.abs(v) >= 1_000) return "Rp" + group(v / 1_000, 0) + "rb";
+      return symbol + formatMinor(Number(minorIdr) * ratePerIdr);
     }
-    return (
-      symbol +
-      v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })
-    );
+    return symbol + group(v, Math.abs(v) >= 1000 ? 1 : 2) + (Math.abs(v) >= 1_000_000 ? "M" : Math.abs(v) >= 1000 ? "k" : "");
   };
   return { code, ratePerIdr, symbol, stale, rp, rpShort };
 }

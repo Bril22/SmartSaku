@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { MINOR } from "./format";
 
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -136,7 +137,10 @@ export async function aiExtractTransactions(
   const parsed = JSON.parse(raw);
   const rows: ImportRow[] = [];
   for (const r of parsed.transactions ?? []) {
-    const check = importRowSchema.safeParse({ ...r, amount: Math.round(Number(r.amount)) });
+    const check = importRowSchema.safeParse({
+      ...r,
+      amount: Math.round(Number(r.amount) * MINOR),
+    });
     if (check.success) rows.push({ ...check.data, include: true });
     if (rows.length >= MAX_ROWS) break;
   }

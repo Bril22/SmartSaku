@@ -306,3 +306,8 @@ model Settings {
   inflationPct    Float  @default(3)
   savingsRatePct  Float  @default(2)
 }
+
+model AppMeta {
+  key   String @id
+  value String
+}

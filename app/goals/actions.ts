@@ -7,7 +7,12 @@ import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
 import { getDebtSummaries } from "@/lib/finance";
-import { monthLabel } from "@/lib/format";
+import { MINOR, monthLabel } from "@/lib/format";
+
+/** the model reasons in rupiah, storage is minor units */
+function rupiah(minor: number): string {
+  return (minor / MINOR).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+}
 
 const BACK = "/future";
 
@@ -185,18 +190,18 @@ export async function askGoalAdvice(formData: FormData) {
     .filter((d) => d.remaining > 0)
     .map(
       (d) =>
-        `${d.lender}: remaining Rp${d.remaining.toLocaleString("en-US")}, ~Rp${d.thisMonthPlanned.toLocaleString("en-US")}/month, finishes ${d.finishMonth ? monthLabel(d.finishMonth) : "?"}`,
+        `${d.lender}: remaining Rp${rupiah(d.remaining)}, ~Rp${rupiah(d.thisMonthPlanned)}/month, finishes ${d.finishMonth ? monthLabel(d.finishMonth) : "?"}`,
     )
     .join("\n");
 
   const summary = [
-    `Monthly income: Rp${income.toLocaleString("en-US")}`,
-    `Planned monthly expenses (excl. debt): Rp${plannedOut.toLocaleString("en-US")}`,
-    `Current savings across accounts: Rp${savings.toLocaleString("en-US")}`,
+    `Monthly income: Rp${rupiah(income)}`,
+    `Planned monthly expenses (excl. debt): Rp${rupiah(plannedOut)}`,
+    `Current savings across accounts: Rp${rupiah(savings)}`,
     `Debts:\n${debtLines || "none"}`,
-    `GOAL: "${goal!.name}" — target Rp${Number(goal!.targetAmount).toLocaleString("en-US")}` +
+    `GOAL: "${goal!.name}" — target Rp${rupiah(Number(goal!.targetAmount))}` +
       (goal!.targetDate ? `, wanted by ${monthLabel(goal!.targetDate)}` : ", no target date") +
-      `, already saved Rp${saved.toLocaleString("en-US")}`,
+      `, already saved Rp${rupiah(saved)}`,
   ].join("\n");
 
   let advice = "";

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
 import { getDebtSummaries, getForecastBasis, projectFuture } from "@/lib/finance";
-import { monthKey, monthLabel } from "@/lib/format";
+import { formatMinor, monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import { clearAssumptions, updateSettings } from "@/app/actions";
 import {
@@ -382,7 +382,7 @@ export default async function FuturePage({
                         <MoneyInput
                           name="amount"
                           required
-                          placeholder={perMonth ? perMonth.toLocaleString("en-US") : "500,000"}
+                          placeholder={perMonth ? formatMinor(perMonth) : "500.000,00"}
                           className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
                         />
                         <label className="block text-[10.5px] font-bold text-inksoft">From account</label>
@@ -472,7 +472,7 @@ export default async function FuturePage({
                 <MoneyInput
                   name="targetAmount"
                   required
-                  placeholder="Target, e.g. 20,000,000"
+                  placeholder="Target, e.g. 20.000.000,00"
                   className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
                 />
               </div>
