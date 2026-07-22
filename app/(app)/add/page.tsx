@@ -30,15 +30,34 @@ export default async function AddPage({
     <div className="max-w-md mx-auto">
       <div className="flex items-baseline justify-between mb-5">
         <h1 className="font-display text-2xl font-semibold">Add transaction</h1>
-        <Link href="/money/transfer" className="text-xs font-bold text-sagedeep">
-          ⇄ Transfer
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/import" className="text-xs font-bold text-sagedeep">
+            📄 Scan file
+          </Link>
+          <Link href="/money/transfer" className="text-xs font-bold text-sagedeep">
+            ⇄ Transfer
+          </Link>
+        </div>
       </div>
       {error && (
         <div className="bg-badbg text-bad rounded-md px-4 py-3 text-sm font-semibold mb-4">
           Please fill the amount and pick an account.
         </div>
       )}
+      <Link
+        href="/import"
+        className="flex items-center gap-3 bg-card border border-line rounded-lg p-3.5 mb-4 hover:border-sagedeep"
+      >
+        <span className="text-xl">📄</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[13px]">Scan a receipt or statement</div>
+          <div className="text-[11.5px] text-inksoft">
+            Photo, PDF, Excel or CSV — Saku AI fills the rows for you
+          </div>
+        </div>
+        <span className="text-inksoft">›</span>
+      </Link>
+
       <TransactionForm
         action={addTransaction}
         accounts={accounts.map((a) => ({

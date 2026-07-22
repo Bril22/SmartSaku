@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Mode = "date" | "month";
+type Mode = "date" | "month" | "datetime";
 type Anchor = { top: number; left: number; maxH: number };
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -19,21 +19,33 @@ function pad(n: number) {
 }
 
 function parse(value: string, mode: Mode) {
-  const m = value.match(mode === "month" ? /^(\d{4})-(\d{2})$/ : /^(\d{4})-(\d{2})-(\d{2})$/);
+  if (mode === "month") {
+    const m = value.match(/^(\d{4})-(\d{2})$/);
+    return m ? { y: Number(m[1]), m: Number(m[2]) - 1, d: 1, hh: 0, mm: 0 } : null;
+  }
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?$/);
   if (!m) return null;
-  return { y: Number(m[1]), m: Number(m[2]) - 1, d: m[3] ? Number(m[3]) : 1 };
+  return {
+    y: Number(m[1]),
+    m: Number(m[2]) - 1,
+    d: Number(m[3]),
+    hh: m[4] ? Number(m[4]) : 0,
+    mm: m[5] ? Number(m[5]) : 0,
+  };
 }
 
-function format(y: number, m: number, d: number, mode: Mode) {
-  return mode === "month" ? `${y}-${pad(m + 1)}` : `${y}-${pad(m + 1)}-${pad(d)}`;
+function format(y: number, m: number, d: number, mode: Mode, hh = 0, mm = 0) {
+  if (mode === "month") return `${y}-${pad(m + 1)}`;
+  const day = `${y}-${pad(m + 1)}-${pad(d)}`;
+  return mode === "datetime" ? `${day}T${pad(hh)}:${pad(mm)}` : day;
 }
 
 function label(value: string, mode: Mode, placeholder: string) {
   const p = parse(value, mode);
   if (!p) return placeholder;
-  return mode === "month"
-    ? `${MONTHS[p.m]} ${p.y}`
-    : `${pad(p.d)} ${MONTHS[p.m]} ${p.y}`;
+  if (mode === "month") return `${MONTHS[p.m]} ${p.y}`;
+  const day = `${pad(p.d)} ${MONTHS[p.m]} ${p.y}`;
+  return mode === "datetime" ? `${day} · ${pad(p.hh)}:${pad(p.mm)}` : day;
 }
 
 export default function DateField({
@@ -46,6 +58,7 @@ export default function DateField({
   placeholder,
   title,
   className = "",
+  defaultNow = false,
 }: {
   name: string;
   defaultValue?: string;
@@ -56,6 +69,8 @@ export default function DateField({
   placeholder?: string;
   title?: string;
   className?: string;
+  /** fill with the viewer's current date/time after mount (never during SSR) */
+  defaultNow?: boolean;
 }) {
   const ph = placeholder ?? (mode === "month" ? "Pick a month" : "Pick a date");
   const [open, setOpen] = useState(false);
@@ -73,6 +88,11 @@ export default function DateField({
   const [picking, setPicking] = useState<"day" | "month" | "year">(
     mode === "month" ? "month" : "day",
   );
+  const [time, setTime] = useState(() => {
+    const p = parse(defaultValue, mode);
+    const now = new Date();
+    return { hh: p?.hh ?? now.getHours(), mm: p?.mm ?? now.getMinutes() };
+  });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<number | null>(null);
@@ -80,10 +100,20 @@ export default function DateField({
 
   useEffect(() => setMounted(true), []);
 
+  // the server clock is not the user's clock, so "now" is decided on the client
+  useEffect(() => {
+    if (!defaultNow || value || controlledValue !== undefined) return;
+    const n = new Date();
+    setUncontrolled(format(n.getFullYear(), n.getMonth(), n.getDate(), mode, n.getHours(), n.getMinutes()));
+  }, [defaultNow, value, controlledValue, mode]);
+
   useEffect(() => {
     if (!open) return;
     const p = parse(value, mode);
-    if (p) setView({ y: p.y, m: p.m });
+    if (p) {
+      setView({ y: p.y, m: p.m });
+      if (mode === "datetime") setTime({ hh: p.hh, mm: p.mm });
+    }
     setPicking(mode === "month" ? "month" : "day");
   }, [open, value, mode]);
 
@@ -300,7 +330,7 @@ export default function DateField({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => commit(format(view.y, view.m, d, mode))}
+                  onClick={() => commit(format(view.y, view.m, d, mode, time.hh, time.mm))}
                   className={`mx-auto flex items-center justify-center rounded-full text-[13px] ${
                     isSheet ? "w-11 h-11" : "w-9 h-9"
                   } ${
@@ -319,6 +349,47 @@ export default function DateField({
         </>
       )}
 
+      {mode === "datetime" && (
+        <div className="flex items-center gap-2 pt-2.5 mt-2 border-t border-line">
+          <span className="text-[11px] font-bold text-inksoft flex-1">Time</span>
+          <select
+            aria-label="Hour"
+            value={time.hh}
+            onChange={(e) => setTime((t) => ({ ...t, hh: Number(e.target.value) }))}
+            className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-sm font-bold"
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {pad(h)}
+              </option>
+            ))}
+          </select>
+          <span className="font-bold text-inksoft">:</span>
+          <select
+            aria-label="Minute"
+            value={time.mm}
+            onChange={(e) => setTime((t) => ({ ...t, mm: Number(e.target.value) }))}
+            className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-sm font-bold"
+          >
+            {Array.from({ length: 60 }, (_, m) => (
+              <option key={m} value={m}>
+                {pad(m)}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              const n = new Date();
+              setTime({ hh: n.getHours(), mm: n.getMinutes() });
+            }}
+            className="text-[11px] font-extrabold text-sagedeep px-1.5"
+          >
+            Now
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-line">
         <button
           type="button"
@@ -330,7 +401,16 @@ export default function DateField({
         <button
           type="button"
           onClick={() =>
-            commit(format(today.getFullYear(), today.getMonth(), today.getDate(), mode))
+            commit(
+              format(
+                today.getFullYear(),
+                today.getMonth(),
+                today.getDate(),
+                mode,
+                time.hh,
+                time.mm,
+              ),
+            )
           }
           className="text-[11.5px] font-extrabold text-sagedeep px-2 py-1.5"
         >

@@ -4,6 +4,7 @@ import { requireSpace } from "@/lib/space";
 import { getMoney } from "@/lib/money";
 import { transferBetweenAccounts } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
+import TransferWhen from "@/components/TransferWhen";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 
@@ -69,6 +70,10 @@ export default async function TransferPage() {
               placeholder="1.000.000,00"
               className="w-full rounded-md border border-line bg-card px-4 py-4 text-2xl font-display font-bold text-center money focus:outline-none focus:border-sagedeep"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-inksoft mb-1.5">Date &amp; time</label>
+            <TransferWhen />
           </div>
           <div>
             <label className="block text-xs font-semibold text-inksoft mb-1.5">Note (optional)</label>

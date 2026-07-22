@@ -67,6 +67,21 @@ export async function register(formData: FormData) {
 
 /* ---------- money ---------- */
 
+/** "2026-07-22T14:30" from the picker, in the viewer's own clock */
+function parseWhen(raw: FormDataEntryValue | null): Date | undefined {
+  const v = String(raw ?? "").trim();
+  if (!v) return undefined;
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?$/);
+  if (!m) return undefined;
+  return new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    m[4] ? Number(m[4]) : 0,
+    m[5] ? Number(m[5]) : 0,
+  );
+}
+
 export async function addTransaction(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
@@ -74,6 +89,7 @@ export async function addTransaction(formData: FormData) {
   const accountId = String(formData.get("accountId") ?? "");
   const categoryId = String(formData.get("categoryId") ?? "") || null;
   const note = String(formData.get("note") ?? "");
+  const date = parseWhen(formData.get("date"));
   if (!amount || !accountId) redirect("/add?error=1");
 
   const account = await prisma.finAccount.findFirst({ where: { id: accountId, userId } });
@@ -81,7 +97,16 @@ export async function addTransaction(formData: FormData) {
 
   await prisma.$transaction([
     prisma.transaction.create({
-      data: { userId, spaceId, accountId, categoryId, amount: BigInt(amount), direction, note },
+      data: {
+        userId,
+        spaceId,
+        accountId,
+        categoryId,
+        amount: BigInt(amount),
+        direction,
+        note,
+        ...(date ? { date } : {}),
+      },
     }),
     prisma.finAccount.update({
       where: { id: accountId },
@@ -226,25 +251,30 @@ export async function transferBetweenAccounts(formData: FormData) {
 
   const transferId = randomUUID();
   const label = note || `Transfer ${from!.name} → ${to!.name}`;
+  const when = parseWhen(formData.get("date"));
   await prisma.$transaction([
     prisma.transaction.create({
       data: {
         userId,
+        spaceId,
         accountId: from!.id,
         amount: BigInt(amount),
         direction: "OUT",
         note: label,
         transferId,
+        ...(when ? { date: when } : {}),
       },
     }),
     prisma.transaction.create({
       data: {
         userId,
+        spaceId,
         accountId: to!.id,
         amount: BigInt(amount),
         direction: "IN",
         note: label,
         transferId,
+        ...(when ? { date: when } : {}),
       },
     }),
     prisma.finAccount.update({

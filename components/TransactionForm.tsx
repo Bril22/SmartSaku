@@ -89,12 +89,16 @@ export default function TransactionForm({
         />
       </div>
 
-      {defaults?.date !== undefined && (
-        <div>
-          <label className="block text-xs font-semibold text-inksoft mb-1.5">Date</label>
-          <DateField name="date" defaultValue={defaults.date} title="Transaction date" />
-        </div>
-      )}
+      <div>
+        <label className="block text-xs font-semibold text-inksoft mb-1.5">Date &amp; time</label>
+        <DateField
+          name="date"
+          mode="datetime"
+          defaultValue={defaults?.date}
+          defaultNow={!defaults?.date}
+          title="Date & time"
+        />
+      </div>
 
       <div>
         <div className="flex items-baseline justify-between mb-1.5">
