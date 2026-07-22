@@ -138,11 +138,17 @@ From the audit in [AUDIT.md](AUDIT.md). None of this is optional once strangers'
 
 28. Per-transaction multi-currency (today only the display converts).
 29. Asset and liability accounts: property, vehicle, gold, receivables.
-30. **Investments read-only**: Indodax gives free IDR crypto prices with no key. Never execute a trade, never hold coins — both need a PAKD licence.
-    **Important design correction:** Indonesian crypto tax under PMK 50/2025 is **final and charged on the gross sale value, not the profit** — 0,21% through a domestic exchange, 1% through a foreign one, and VAT on the asset itself was removed. So never present "realised gain" as a tax base. Showing the estimated 0,21% on a sale is a genuine differentiator nobody offers.
-    Indonesian mutual fund (reksa dana) NAV has **no free daily feed** — manual entry only. IDX end-of-day prices need a paid provider (~$10–20/month); Yahoo works but has no commercial licence.
-31. **Zakat**: a precise, citable spec (2,5%, nisab = 85g gold, Rp 91.681.728 for 2026 by BAZNAS decree). 64% of payers already give digitally. The only competitor has 50 downloads. Note that murabahah debt has no interest to save, so the payoff engine needs a debt-type flag.
-32. **Tax estimate only** — PPh 21 brackets and PTKP, clearly marked as an estimate. Preparing figures is fine; advising is not.
+30. **Investments read-only.** Never execute a trade, never hold coins — both need a PAKD licence.
+    - **Crypto:** Indodax gives free IDR prices with no key. Tax under PMK 50/2025 is **final on the gross sale value, not the profit** — 0,21% domestic, 1% foreign, and VAT on the asset was removed. Never present "realised gain" as a tax base. The same shape applies to shares: the 0,1% is on **gross sale value**, so the SPT figure is the sum of sell transactions, not the gain.
+    - **Reksa dana:** OJK publishes free, official, per-fund NAB and unit counts — but **month-end only, from the 8th of the following month**. One request per month returns roughly 2.100 funds, and NAV per unit is NAB ÷ units. There is **no free daily NAV anywhere**; daily means an institutional contract. Say "updated monthly from OJK" in the interface rather than implying live prices.
+    - **IDX shares:** real-time is out of reach — Rp22.000.000/month base **plus Rp30.000 per user per month**, so 1.000 users would cost over Rp50 juta a month. End-of-day carries **no per-user fee**, and IDX's own catalogue aims its `EoD Professional` tier at "Application Developer, Fintech Startup" at **Rp2.700.000/month plus a 300% deposit** — but licensing requires a PT. Until then, manual entry.
+    - **Do not build on Yahoo Finance.** It works technically, but its terms forbid deriving income from the API, so the exposure grows with every paying user.
+
+31. **Store investment holdings in the shape the tax form wants.** For tax year 2025 the old 1770 / 1770 S / 1770 SS forms were merged into one, asset codes went from three digits to four (shares 0303, reksa dana 0307, crypto 0399), and — the part that matters — the return now requires a **year-end market value**, not only acquisition cost, plus the institution name, its NPWP or foreign TIN, and the account number.
+    If SmartSaku records acquisition cost, acquisition year, the 31 December valuation and that institution metadata from the start, it can later generate DJP's *Daftar Harta* XML directly; the schema is public. That is close to free to prepare for now and expensive to retrofit, and no competitor does it.
+
+32. **Zakat**: a precise, citable spec (2,5%, nisab = 85g gold, Rp 91.681.728 for 2026 by BAZNAS decree). 64% of payers already give digitally. The only competitor has 50 downloads. Note that murabahah debt has no interest to save, so the payoff engine needs a debt-type flag.
+33. **Tax estimate only** — PPh 21 brackets and PTKP, clearly marked as an estimate. Preparing figures is fine; advising is not, and filing needs a PJAP appointment. Several numbers in the research were flagged unverified (the no-NPWP surcharge, reksa dana treatment); check each against a primary source before it appears on screen.
 
 ---
 
