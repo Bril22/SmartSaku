@@ -27,6 +27,7 @@ const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALL
 
 type Search = {
   tab?: string;
+  all?: string;
   month?: string;
   range?: string;
   from?: string;
@@ -63,7 +64,9 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
         ))}
       </div>
 
-      {tab === "accounts" && <AccountsTab userId={userId} spaceId={spaceId} money={money} />}
+      {tab === "accounts" && (
+        <AccountsTab userId={userId} spaceId={spaceId} money={money} showAll={sp.all === "1"} />
+      )}
       {tab === "history" && <HistoryTab userId={userId} spaceId={spaceId} money={money} sp={sp} />}
       {tab === "debts" && <DebtsTab userId={userId} spaceId={spaceId} money={money} />}
       {tab === "plan" && <PlanTab userId={userId} spaceId={spaceId} money={money} />}
@@ -82,7 +85,7 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
     }),
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
     prisma.transaction.findMany({
@@ -290,49 +293,86 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
 type MoneyCtx = Awaited<ReturnType<typeof getMoney>>;
 type Ctx = { userId: string; spaceId: string; money: MoneyCtx };
 
-async function AccountsTab({ userId, spaceId, money }: Ctx) {
+async function AccountsTab({ userId, spaceId, money, showAll }: Ctx & { showAll?: boolean }) {
   const accounts = await prisma.finAccount.findMany({
     where: { spaceId, archived: false },
-    orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
-  const total = accounts.reduce((a, x) => a + Number(x.balance), 0);
+  const counted = accounts.filter((a) => !a.hidden);
+  const total = counted.reduce((a, x) => a + Number(x.balance), 0);
+  const hiddenCount = accounts.length - counted.length;
+  const visible = showAll ? accounts : accounts.slice(0, 5);
 
   return (
     <div className="max-w-md">
       <div className="bg-card border border-line rounded-lg p-4 mb-5 shadow-soft">
-        <div className="text-[11px] uppercase tracking-wide text-inksoft">All accounts</div>
+        <div className="text-[11px] uppercase tracking-wide text-inksoft">
+          All accounts{hiddenCount > 0 ? ` · ${hiddenCount} hidden not counted` : ""}
+        </div>
         <div className="font-display text-2xl font-bold money mt-0.5">{money.rp(total)}</div>
       </div>
 
       <div className="space-y-2 mb-4">
-        {accounts.map((a) => (
+        {visible.map((a) => (
           <details key={a.id} className="bg-card border border-line rounded-md group">
             <summary className="p-3.5 flex items-center gap-3 cursor-pointer list-none">
               <span className="text-lg">{TYPE_ICON[a.type]}</span>
-              <div className="flex-1">
-                <div className="font-bold text-[13.5px]">{a.name}</div>
-                <div className="text-[11px] text-inksoft">{a.type.toLowerCase()}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[13.5px] flex items-center gap-1.5">
+                  <span className="truncate">{a.name}</span>
+                  {a.primary && <span className="text-sagedeep text-[11px]">★</span>}
+                </div>
+                <div className="text-[11px] text-inksoft">
+                  {a.type.toLowerCase()}
+                  {a.hidden && " · hidden from totals"}
+                </div>
               </div>
-              <div className="font-extrabold money text-[14px]">{money.rp(Number(a.balance))}</div>
+              <div className={`font-extrabold money text-[14px] ${a.hidden ? "text-inksoft" : ""}`}>
+                {money.rp(Number(a.balance))}
+              </div>
             </summary>
-            <form action={updateAccountBalance} className="px-3.5 pb-3.5 flex gap-2 items-center">
+            <form action={updateAccountBalance} className="px-3.5 pb-3.5 space-y-2">
               <input type="hidden" name="accountId" value={a.id} />
-              <div className="flex-1">
-                <MoneyInput
-                  name="balance"
-                  defaultValue={Number(a.balance)}
-                  className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm text-right money"
-                />
+              <input type="hidden" name="backTo" value="/money?tab=accounts" />
+              <MoneyInput
+                name="balance"
+                defaultValue={Number(a.balance)}
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+              <input
+                name="reason"
+                placeholder="Note (optional)"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-xs"
+              />
+              <div className="flex gap-2">
+                <SubmitButton
+                  name="mode"
+                  value="record"
+                  className="flex-1 bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2"
+                  pendingText="…"
+                >
+                  Record difference
+                </SubmitButton>
+                <SubmitButton
+                  name="mode"
+                  value="correct"
+                  className="flex-1 border border-line text-earth rounded-full text-[11px] font-extrabold py-2"
+                  pendingText="…"
+                >
+                  Just correct
+                </SubmitButton>
               </div>
-              <SubmitButton
-                className="bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold px-4 py-2"
-                pendingText="…"
-              >
-                Set balance
-              </SubmitButton>
             </form>
           </details>
         ))}
+        {!showAll && accounts.length > 5 && (
+          <Link
+            href="/money?tab=accounts&all=1"
+            className="block text-center text-xs font-extrabold text-sagedeep py-2"
+          >
+            See all {accounts.length} accounts →
+          </Link>
+        )}
       </div>
 
       <details className="mb-2">

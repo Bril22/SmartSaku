@@ -52,7 +52,7 @@ export default async function FuturePage({
     }),
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
     getForecastBasis(userId, spaceId),

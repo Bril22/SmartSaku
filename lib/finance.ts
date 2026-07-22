@@ -144,7 +144,7 @@ export async function getForecastBasis(userId: string, spaceId: string): Promise
 export async function projectFuture(userId: string, spaceId: string, years: number): Promise<ProjectionPoint[]> {
   const [settings, accounts, debts, plannedItems] = await Promise.all([
     prisma.settings.findUnique({ where: { userId } }),
-    prisma.finAccount.findMany({ where: { spaceId } }),
+    prisma.finAccount.findMany({ where: { spaceId, hidden: false } }),
     prisma.debt.findMany({ where: { spaceId }, include: { schedule: true, payments: true, adjustments: true } }),
     prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
   ]);

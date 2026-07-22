@@ -97,12 +97,16 @@ model FinAccount {
   type      AccountType
   balance   BigInt      @default(0)
   archived  Boolean     @default(false)
+  hidden    Boolean     @default(false)
+  primary   Boolean     @default(false)
+  sortOrder Int         @default(0)
   createdAt DateTime    @default(now())
 
   spaceId      String?
   space        Space?               @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   transactions Transaction[]
   planned      PlannedTransaction[]
+  corrections  BalanceCorrection[]
 }
 
 enum DebtStatus {
@@ -169,6 +173,11 @@ model DebtAdjustment {
   createdAt DateTime @default(now())
 }
 
+enum TxKind {
+  NORMAL
+  BALANCE_ADJUSTMENT
+}
+
 enum CategoryType {
   INCOME
   EXPENSE
@@ -215,6 +224,7 @@ model Transaction {
   plannedMonth  DateTime?  @db.Date
   importBatchId String?
   transferId    String?
+  kind          TxKind    @default(NORMAL)
 
   @@unique([plannedId, plannedMonth])
   @@index([userId, date])
@@ -310,4 +320,18 @@ model Settings {
 model AppMeta {
   key   String @id
   value String
+}
+
+/// audit trail for balances corrected without creating a transaction
+model BalanceCorrection {
+  id        String     @id @default(cuid())
+  accountId String
+  account   FinAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId    String
+  before    BigInt
+  after     BigInt
+  reason    String     @default("")
+  createdAt DateTime   @default(now())
+
+  @@index([accountId, createdAt])
 }

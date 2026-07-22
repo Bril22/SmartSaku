@@ -12,13 +12,14 @@ export default async function TransferPage() {
   const [accounts, money] = await Promise.all([
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getMoney(userId),
   ]);
+  const primaryId = accounts.find((a) => a.primary)?.id;
   const options = accounts.map((a) => ({
     value: a.id,
-    label: `${a.name} · ${money.rpShort(Number(a.balance))}`,
+    label: `${a.hidden ? "🙈 " : ""}${a.name} · ${money.rpShort(Number(a.balance))}`,
     icon: "🏦",
   }));
 
@@ -45,7 +46,7 @@ export default async function TransferPage() {
               name="fromAccountId"
               required
               label="Transfer from"
-              defaultValue={options[0]?.value}
+              defaultValue={primaryId ?? options[0]?.value}
               options={options}
             />
           </div>
@@ -56,7 +57,7 @@ export default async function TransferPage() {
               name="toAccountId"
               required
               label="Transfer to"
-              defaultValue={options[1]?.value}
+              defaultValue={options.find((o) => o.value !== (primaryId ?? options[0]?.value))?.value}
               options={options}
             />
           </div>

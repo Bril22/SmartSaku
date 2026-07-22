@@ -36,7 +36,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
   const [accounts, money] = await Promise.all([
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getMoney(userId),
   ]);

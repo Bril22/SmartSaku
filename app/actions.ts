@@ -112,10 +112,98 @@ export async function updateAccountBalance(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("accountId") ?? "");
   const balance = Math.round(Number(formData.get("balance") ?? 0));
-  await prisma.finAccount.updateMany({ where: { id, spaceId }, data: { balance: BigInt(balance) } });
-  revalidatePath("/money");
-  revalidatePath("/");
-  redirect("/money?ok=" + encodeURIComponent("Balance updated"));
+  const mode = String(formData.get("mode") ?? "record");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const backTo = String(formData.get("backTo") ?? "/settings/accounts");
+
+  const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
+  if (!account) redirect(`${backTo}?err=` + encodeURIComponent("Account not found"));
+
+  const before = Number(account!.balance);
+  const diff = balance - before;
+  if (diff === 0) {
+    redirect(`${backTo}?ok=` + encodeURIComponent("Balance unchanged"));
+  }
+
+  if (mode === "correct") {
+    // silent fix: no transaction, but keep a record of what changed
+    await prisma.$transaction([
+      prisma.finAccount.update({ where: { id }, data: { balance: BigInt(balance) } }),
+      prisma.balanceCorrection.create({
+        data: { accountId: id, userId, before: BigInt(before), after: BigInt(balance), reason },
+      }),
+    ]);
+    redirect(`${backTo}?ok=` + encodeURIComponent("Balance corrected — logged for audit"));
+  }
+
+  // default: make the difference visible as a real transaction
+  await prisma.$transaction([
+    prisma.transaction.create({
+      data: {
+        userId,
+        spaceId,
+        accountId: id,
+        amount: BigInt(Math.abs(diff)),
+        direction: diff > 0 ? "IN" : "OUT",
+        note: reason || "Balance adjustment",
+        kind: "BALANCE_ADJUSTMENT",
+      },
+    }),
+    prisma.finAccount.update({ where: { id }, data: { balance: BigInt(balance) } }),
+  ]);
+  redirect(
+    `${backTo}?ok=` +
+      encodeURIComponent(
+        `Recorded ${diff > 0 ? "income" : "expense"} of ${formatMinor(Math.abs(diff))}`,
+      ),
+  );
+}
+
+export async function setPrimaryAccount(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("accountId") ?? "");
+  const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
+  if (!account) redirect("/settings/accounts?err=" + encodeURIComponent("Account not found"));
+  await prisma.$transaction([
+    prisma.finAccount.updateMany({ where: { spaceId }, data: { primary: false } }),
+    prisma.finAccount.update({ where: { id }, data: { primary: true } }),
+  ]);
+  revalidatePath("/", "layout");
+  redirect("/settings/accounts?ok=" + encodeURIComponent(`${account!.name} is now your main account`));
+}
+
+export async function toggleAccountHidden(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("accountId") ?? "");
+  const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
+  if (!account) redirect("/settings/accounts?err=" + encodeURIComponent("Account not found"));
+  const hidden = !account!.hidden;
+  await prisma.finAccount.update({ where: { id }, data: { hidden } });
+  revalidatePath("/", "layout");
+  redirect(
+    "/settings/accounts?ok=" +
+      encodeURIComponent(
+        hidden
+          ? `${account!.name} is hidden — left out of totals and charts`
+          : `${account!.name} counts towards your totals again`,
+      ),
+  );
+}
+
+export async function reorderAccounts(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const ids = String(formData.get("order") ?? "").split(",").filter(Boolean);
+  if (!ids.length) redirect("/settings/accounts");
+  const owned = await prisma.finAccount.findMany({ where: { spaceId }, select: { id: true } });
+  const allowed = new Set(owned.map((a) => a.id));
+  if (ids.some((id) => !allowed.has(id))) {
+    redirect("/settings/accounts?err=" + encodeURIComponent("That order does not match your accounts"));
+  }
+  await prisma.$transaction(
+    ids.map((id, i) => prisma.finAccount.update({ where: { id }, data: { sortOrder: i } })),
+  );
+  revalidatePath("/", "layout");
+  redirect("/settings/accounts?ok=" + encodeURIComponent("Order saved"));
 }
 
 export async function transferBetweenAccounts(formData: FormData) {

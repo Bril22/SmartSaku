@@ -14,7 +14,7 @@ export default async function AddPage({
   const [accounts, categories] = await Promise.all([
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
   ]);
@@ -41,8 +41,13 @@ export default async function AddPage({
       )}
       <TransactionForm
         action={addTransaction}
-        accounts={accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }))}
+        accounts={accounts.map((a) => ({
+          value: a.id,
+          label: a.hidden ? `${a.name} (hidden)` : a.name,
+          icon: "🏦",
+        }))}
         categories={categoryOptions}
+        defaults={{ accountId: (accounts.find((a) => a.primary) ?? accounts[0])?.id }}
       />
     </div>
   );

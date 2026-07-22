@@ -19,11 +19,11 @@ export default async function HomePage() {
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getDebtSummaries(spaceId),
     prisma.transaction.findMany({
-      where: { spaceId, date: { gte: now, lt: nextMonth } },
+      where: { spaceId, date: { gte: now, lt: nextMonth }, account: { hidden: false } },
       include: { category: true },
     }),
     prisma.plannedTransaction.findMany({
@@ -37,7 +37,8 @@ export default async function HomePage() {
   );
   const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name, icon: "🏦" }));
 
-  const totalSavings = accounts.reduce((a, x) => a + Number(x.balance), 0);
+  const visibleAccounts = accounts.filter((a) => !a.hidden);
+  const totalSavings = visibleAccounts.reduce((a, x) => a + Number(x.balance), 0);
   const totalDebt = debts.reduce((a, d) => a + d.remaining, 0);
   const dueThisMonth = debts.filter((d) => d.thisMonthPlanned > 0);
   const unpaid = dueThisMonth.filter((d) => d.thisMonthStatus === "DUE");
@@ -200,7 +201,7 @@ export default async function HomePage() {
         </Link>
       </div>
       <div className="grid grid-cols-2 gap-3 mb-6 md:mb-0">
-        {accounts.map((a) => (
+        {visibleAccounts.map((a) => (
           <div key={a.id} className="bg-card border border-line rounded-md p-3.5">
             <div className="text-[10.5px] uppercase tracking-wide text-inksoft">{a.name}</div>
             <div className="font-extrabold money mt-1 text-[15px]">{money.rp(Number(a.balance))}</div>

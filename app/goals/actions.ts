@@ -177,7 +177,7 @@ export async function askGoalAdvice(formData: FormData) {
 
   const [debts, accounts, planned, settings] = await Promise.all([
     getDebtSummaries(spaceId),
-    prisma.finAccount.findMany({ where: { spaceId, archived: false } }),
+    prisma.finAccount.findMany({ where: { spaceId, archived: false, hidden: false } }),
     prisma.plannedTransaction.findMany({ where: { spaceId, active: true } }),
     prisma.settings.findUnique({ where: { userId } }),
   ]);

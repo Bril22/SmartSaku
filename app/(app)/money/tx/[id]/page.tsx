@@ -19,7 +19,7 @@ export default async function EditTransactionPage({
     prisma.transaction.findFirst({ where: { id, spaceId }, include: { category: true } }),
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
-      orderBy: [{ createdAt: "asc" }, { name: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
   ]);
