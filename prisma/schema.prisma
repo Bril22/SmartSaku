@@ -395,6 +395,19 @@ model NotificationLog {
   @@unique([userId, kind])
 }
 
+/// A durable record of destructive actions. No foreign keys, so it survives the
+/// cascade delete of whatever it describes.
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  spaceId   String?
+  action    String
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([spaceId, createdAt])
+}
+
 model NativePushToken {
   id        String   @id @default(cuid())
   userId    String

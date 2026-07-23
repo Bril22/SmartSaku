@@ -11,6 +11,8 @@ import { ensurePersonalSpace, requireOwner, requireSpace } from "@/lib/space";
 import { createSession, destroySession, getSessionUserId, safeBackTo } from "@/lib/auth";
 import { addMonths, formatMinor, monthKey } from "@/lib/format";
 import { parseWhen, recordTransaction } from "@/lib/tx";
+import { toNum } from "@/lib/validate";
+import { logAudit } from "@/lib/audit";
 
 
 
@@ -65,7 +67,7 @@ export async function register(formData: FormData) {
 
 export async function addTransaction(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
   const accountId = String(formData.get("accountId") ?? "");
   const categoryId = String(formData.get("categoryId") ?? "") || null;
@@ -116,7 +118,7 @@ export async function addAccount(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const name = String(formData.get("name") ?? "").trim();
   const type = String(formData.get("type") ?? "BANK") as "BANK" | "SAVINGS" | "EWALLET" | "CASH";
-  const balance = Math.round(Number(formData.get("balance") ?? 0));
+  const balance = Math.round(toNum(formData.get("balance") ?? 0));
   const backTo = safeBackTo(formData.get("backTo"), "/money");
   if (!name) redirect(backTo);
   await prisma.finAccount.create({ data: { userId, spaceId, name, type, balance: BigInt(balance) } });
@@ -127,7 +129,7 @@ export async function addAccount(formData: FormData) {
 export async function updateAccountBalance(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("accountId") ?? "");
-  const balance = Math.round(Number(formData.get("balance") ?? 0));
+  const balance = Math.round(toNum(formData.get("balance") ?? 0));
   const mode = String(formData.get("mode") ?? "record");
   const reason = String(formData.get("reason") ?? "").trim();
   const backTo = safeBackTo(formData.get("backTo"), "/settings/accounts");
@@ -240,7 +242,7 @@ export async function transferBetweenAccounts(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const fromId = String(formData.get("fromAccountId") ?? "");
   const toId = String(formData.get("toAccountId") ?? "");
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const note = String(formData.get("note") ?? "").trim();
   const back = "/money/transfer";
 
@@ -301,7 +303,7 @@ export async function transferBetweenAccounts(formData: FormData) {
 export async function updateTransaction(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
   const accountId = String(formData.get("accountId") ?? "");
   const categoryId = String(formData.get("categoryId") ?? "") || null;
@@ -406,7 +408,7 @@ export async function payDebtMonth(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const debtId = String(formData.get("debtId") ?? "");
   const monthIso = String(formData.get("month") ?? "");
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const accountId = String(formData.get("accountId") ?? "") || null;
   const backTo = safeBackTo(formData.get("backTo"), "/");
 
@@ -510,7 +512,7 @@ export async function payDebtMonth(formData: FormData) {
 export async function adjustDebt(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const debtId = String(formData.get("debtId") ?? "");
-  const delta = Math.round(Number(formData.get("delta") ?? 0));
+  const delta = Math.round(toNum(formData.get("delta") ?? 0));
   const reason = String(formData.get("reason") ?? "");
   const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt || !delta) redirect(`/debts/${debtId}`);
@@ -528,8 +530,8 @@ const DEBT_COLORS = ["#C96F4A", "#31694E", "#BBC863", "#827148", "#E8A07C", "#65
 export async function addDebt(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const lender = String(formData.get("lender") ?? "").trim();
-  const total = Math.abs(Math.round(Number(formData.get("total") ?? 0)));
-  const monthly = Math.abs(Math.round(Number(formData.get("monthly") ?? 0)));
+  const total = Math.abs(Math.round(toNum(formData.get("total") ?? 0)));
+  const monthly = Math.abs(Math.round(toNum(formData.get("monthly") ?? 0)));
   const startRaw = String(formData.get("start") ?? "");
   if (!lender || !total || !monthly) {
     redirect("/money?tab=debts&err=" + encodeURIComponent("Please fill name, total, and monthly amount"));
@@ -541,8 +543,8 @@ export async function addDebt(formData: FormData) {
   const now = new Date();
   const [sy, sm] = startRaw.split("-").map(Number);
   const start = sy && sm ? new Date(Date.UTC(sy, sm - 1, 1)) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const aprPct = Math.max(0, Number(formData.get("aprPct") ?? 0)) || 0;
-  const minPayment = Math.abs(Math.round(Number(formData.get("minPayment") ?? 0))) || monthly;
+  const aprPct = Math.max(0, toNum(formData.get("aprPct") ?? 0)) || 0;
+  const minPayment = Math.abs(Math.round(toNum(formData.get("minPayment") ?? 0))) || monthly;
   const kind = String(formData.get("kind") ?? "other").slice(0, 20) || "other";
   const count = await prisma.debt.count({ where: { spaceId } });
   const debt = await prisma.debt.create({
@@ -581,7 +583,7 @@ export async function addDebt(formData: FormData) {
 export async function updateScheduleEntry(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const entryId = String(formData.get("entryId") ?? "");
-  const planned = Math.abs(Math.round(Number(formData.get("planned") ?? 0)));
+  const planned = Math.abs(Math.round(toNum(formData.get("planned") ?? 0)));
   const entry = await prisma.debtScheduleEntry.findFirst({
     where: { id: entryId, debt: { spaceId } },
   });
@@ -609,7 +611,7 @@ export async function deleteScheduleEntry(formData: FormData) {
 export async function addScheduleEntry(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const debtId = String(formData.get("debtId") ?? "");
-  const planned = Math.abs(Math.round(Number(formData.get("planned") ?? 0)));
+  const planned = Math.abs(Math.round(toNum(formData.get("planned") ?? 0)));
   const monthRaw = String(formData.get("month") ?? "");
   const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   const [y, m] = monthRaw.split("-").map(Number);
@@ -651,8 +653,8 @@ export async function updateDebtDetails(formData: FormData) {
   const debtId = String(formData.get("debtId") ?? "");
   const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt) redirect("/money?tab=debts");
-  const aprPct = Math.min(1000, Math.max(0, Number(formData.get("aprPct") ?? 0))) || 0;
-  const minPayment = Math.abs(Math.round(Number(formData.get("minPayment") ?? 0)));
+  const aprPct = Math.min(1000, Math.max(0, toNum(formData.get("aprPct") ?? 0))) || 0;
+  const minPayment = Math.abs(Math.round(toNum(formData.get("minPayment") ?? 0)));
   const kind = String(formData.get("kind") ?? "other").slice(0, 20) || "other";
   await prisma.debt.update({
     where: { id: debtId },
@@ -667,6 +669,7 @@ export async function deleteDebt(formData: FormData) {
   const debtId = String(formData.get("debtId") ?? "");
   const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
   if (!debt) redirect("/money?tab=debts");
+  await logAudit(userId, spaceId, "delete_debt", `Deleted debt "${debt!.lender}"`);
   await prisma.debt.delete({ where: { id: debtId } });
   revalidatePath("/", "layout");
   redirect(
@@ -678,7 +681,7 @@ export async function deleteDebt(formData: FormData) {
 export async function updateDebtPayment(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const paymentId = String(formData.get("paymentId") ?? "");
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const owned = await prisma.debtPayment.findFirst({
     where: { id: paymentId, debt: { spaceId } },
   });
@@ -784,9 +787,9 @@ function planWindow(formData: FormData): { startMonth: Date; endMonth: Date | nu
 export async function addPlanned(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const name = String(formData.get("name") ?? "").trim();
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
-  const dayOfMonth = Math.min(28, Math.max(1, Math.round(Number(formData.get("dayOfMonth") ?? 1))));
+  const dayOfMonth = Math.min(28, Math.max(1, Math.round(toNum(formData.get("dayOfMonth") ?? 1))));
   const accountId = String(formData.get("accountId") ?? "") || null;
   const categoryId = String(formData.get("categoryId") ?? "") || null;
   if (!name || !amount) {
@@ -823,8 +826,8 @@ export async function updatePlanned(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
-  const dayOfMonth = Math.min(28, Math.max(1, Math.round(Number(formData.get("dayOfMonth") ?? 1))));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
+  const dayOfMonth = Math.min(28, Math.max(1, Math.round(toNum(formData.get("dayOfMonth") ?? 1))));
   const accountId = String(formData.get("accountId") ?? "") || null;
   const categoryId = String(formData.get("categoryId") ?? "") || null;
   const planned = await prisma.plannedTransaction.findFirst({ where: { id, spaceId } });
@@ -924,8 +927,8 @@ export async function recordPlanned(formData: FormData) {
 
 export async function updateSettings(formData: FormData) {
   const { userId } = await requireSpace();
-  const num = (k: string) => Math.max(0, Math.round(Number(formData.get(k) ?? 0)));
-  const flt = (k: string) => Number(formData.get(k) ?? 0);
+  const num = (k: string) => Math.max(0, Math.round(toNum(formData.get(k) ?? 0)));
+  const flt = (k: string) => toNum(formData.get(k) ?? 0);
   const values = {
     monthlyIncome: BigInt(num("monthlyIncome")),
     monthlyExpense: BigInt(num("monthlyExpense")),
@@ -965,7 +968,7 @@ export async function addHolding(formData: FormData) {
   const kind = String(formData.get("kind") ?? "crypto");
   if (kind === "crypto") {
     const symbol = String(formData.get("symbol") ?? "").trim().toUpperCase().slice(0, 12);
-    const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
+    const quantity = Math.max(0, toNum(formData.get("quantity") ?? 0));
     if (!symbol || !quantity) {
       redirect("/invest?err=" + encodeURIComponent("Enter a coin and an amount"));
     }
@@ -974,7 +977,7 @@ export async function addHolding(formData: FormData) {
     });
   } else {
     const name = String(formData.get("name") ?? "").trim().slice(0, 60);
-    const value = Math.abs(Math.round(Number(formData.get("value") ?? 0)));
+    const value = Math.abs(Math.round(toNum(formData.get("value") ?? 0)));
     if (!name || !value) {
       redirect("/invest?err=" + encodeURIComponent("Enter a name and a value"));
     }
@@ -993,11 +996,11 @@ export async function updateHolding(formData: FormData) {
   const existing = await prisma.holding.findFirst({ where: { id, spaceId } });
   if (!existing) redirect("/invest");
   if (existing!.kind === "crypto") {
-    const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
+    const quantity = Math.max(0, toNum(formData.get("quantity") ?? 0));
     await prisma.holding.update({ where: { id }, data: { quantity } });
   } else {
     const name = String(formData.get("name") ?? "").trim().slice(0, 60) || existing!.name;
-    const value = Math.abs(Math.round(Number(formData.get("value") ?? 0)));
+    const value = Math.abs(Math.round(toNum(formData.get("value") ?? 0)));
     await prisma.holding.update({ where: { id }, data: { name, manualValue: BigInt(value) } });
   }
   revalidatePath("/invest");

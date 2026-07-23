@@ -65,9 +65,15 @@ Database checked after the fix: no unscoped rows remain in any table.
 
 ### Medium
 
-6. Inconsistent input validation — several actions can throw a 500 instead of rejecting politely.
-7. No soft deletes, and no audit trail beyond `BalanceCorrection`.
-8. No observability: no error tracking, no structured logging.
+6. Input validation: every numeric form field now goes through `toNum` (lib/validate), so a
+   malformed value becomes 0 instead of a `BigInt(NaN)` 500. Covered by tests.
+7. Audit trail: `AuditLog` records the destructive cascades (deleting an account or a debt) with
+   no foreign keys, so the record survives the delete. Full soft-delete-with-recovery (undeleting)
+   is still open — it would need every read to filter `deletedAt`, so it is deferred as its own
+   pass.
+8. Observability: `instrumentation.ts` `onRequestError` logs every uncaught server error as
+   structured JSON with route context (ready to forward to Sentry), and `error.tsx` /
+   `global-error.tsx` show a calm branded fallback instead of a raw crash.
 9. Search uses unindexed `contains` across relations.
 
 ### Done since

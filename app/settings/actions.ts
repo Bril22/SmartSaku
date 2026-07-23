@@ -10,6 +10,8 @@ import { createSession, destroySession, revokeSessions } from "@/lib/auth";
 import { CURRENCIES } from "@/lib/money";
 import { normaliseStartDay } from "@/lib/format";
 import { notifyUser } from "@/lib/push";
+import { toNum } from "@/lib/validate";
+import { logAudit } from "@/lib/audit";
 
 
 
@@ -134,6 +136,12 @@ export async function deleteFinAccount(formData: FormData) {
   const account = await prisma.finAccount.findFirst({ where: { id, spaceId } });
   if (!account) back(path, "Account not found", true);
   const txCount = await prisma.transaction.count({ where: { accountId: id, userId } });
+  await logAudit(
+    userId,
+    spaceId,
+    "delete_account",
+    `Deleted account "${account!.name}" (${txCount} transactions, mode: ${mode})`,
+  );
 
   if (txCount === 0) {
     await prisma.finAccount.delete({ where: { id } });
@@ -230,7 +238,7 @@ export async function updateCategory(formData: FormData) {
   });
   if (!parsed.success) back("/settings/categories", "Name cannot be empty", true);
   const { name, icon } = parsed.data!;
-  const budget = Math.abs(Math.round(Number(formData.get("budget") ?? 0)));
+  const budget = Math.abs(Math.round(toNum(formData.get("budget") ?? 0)));
   const conflict = await prisma.category.findFirst({
     where: { spaceId, name, type: existing!.type, NOT: { id } },
   });
@@ -273,7 +281,7 @@ export async function updateNotifyPrefs(formData: FormData) {
   const { userId } = await requireSpace();
   const notifyDaily = formData.get("notifyDaily") === "1";
   const notifyDebts = formData.get("notifyDebts") === "1";
-  const notifyHour = Math.min(23, Math.max(0, Math.round(Number(formData.get("notifyHour") ?? 20))));
+  const notifyHour = Math.min(23, Math.max(0, Math.round(toNum(formData.get("notifyHour") ?? 20))));
   const notifyTz = (String(formData.get("notifyTz") ?? "").slice(0, 60)) || "Asia/Jakarta";
   await prisma.settings.upsert({
     where: { userId },
@@ -299,7 +307,7 @@ export async function sendTestNotification() {
 
 export async function updateMonthStart(formData: FormData) {
   const { userId } = await requireSpace();
-  const day = normaliseStartDay(Number(formData.get("monthStartDay")));
+  const day = normaliseStartDay(toNum(formData.get("monthStartDay")));
   await prisma.settings.upsert({
     where: { userId },
     update: { monthStartDay: day },
@@ -338,7 +346,7 @@ export async function addTemplate(formData: FormData) {
   if (!parsed.success) back(TEMPLATES, "Please give the template a name", true);
   const { name, emoji } = parsed.data!;
   const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const categoryId = await validCategory(formData.get("categoryId"), spaceId!);
   const accountId = await validAccount(formData.get("accountId"), spaceId!);
   const note = String(formData.get("note") ?? "").slice(0, 120);
@@ -362,7 +370,7 @@ export async function updateTemplate(formData: FormData) {
   if (!parsed.success) back(TEMPLATES, "Name cannot be empty", true);
   const { name, emoji } = parsed.data!;
   const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
-  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const amount = Math.abs(Math.round(toNum(formData.get("amount") ?? 0)));
   const categoryId = await validCategory(formData.get("categoryId"), spaceId!);
   const accountId = await validAccount(formData.get("accountId"), spaceId!);
   const note = String(formData.get("note") ?? "").slice(0, 120);
