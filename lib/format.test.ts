@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   MINOR,
+  evalMoneyExpr,
   formatMinor,
+  hasMathOperator,
+  majorToTyped,
   minorToTyped,
   normaliseTyped,
   parseMinor,
@@ -79,6 +82,43 @@ describe("round trip through the editor", () => {
   it("omits ,00 so the user does not have to delete it", () => {
     expect(minorToTyped(675000000)).toBe("6750000");
     expect(minorToTyped(670000025)).toBe("6700000,25");
+  });
+});
+
+describe("inline calculator", () => {
+  it("detects a binary operator, not a leading minus", () => {
+    expect(hasMathOperator("15000+3500")).toBe(true);
+    expect(hasMathOperator("20000*3")).toBe(true);
+    expect(hasMathOperator("100000-5000")).toBe(true);
+    expect(hasMathOperator("-500000")).toBe(false);
+    expect(hasMathOperator("1.234.567")).toBe(false);
+  });
+
+  it.each([
+    ["15000+3500", 18500],
+    ["15.000+3.500", 18500],
+    ["20000*3", 60000],
+    ["100000/4", 25000],
+    ["100000-5000", 95000],
+    ["10000+2500*2", 15000],
+    ["(10000+2000)*2", 24000],
+    ["1000,50+0,50", 1001],
+  ])("evaluates %s to %d", (input, expected) => {
+    expect(evalMoneyExpr(input)).toBe(expected);
+  });
+
+  it("rejects broken or unsafe input", () => {
+    expect(evalMoneyExpr("10000+")).toBe(null);
+    expect(evalMoneyExpr("(10000")).toBe(null);
+    expect(evalMoneyExpr("10000/0")).toBe(null);
+    expect(evalMoneyExpr("5000abc")).toBe(null);
+    expect(evalMoneyExpr("")).toBe(null);
+  });
+
+  it("folds an evaluated result back into a typed money string", () => {
+    expect(majorToTyped(18500)).toBe("18500");
+    expect(typedDisplay(majorToTyped(18500))).toBe("18.500");
+    expect(typedToMinor(majorToTyped(evalMoneyExpr("15000+3500")!))).toBe("1850000");
   });
 });
 

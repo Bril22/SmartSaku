@@ -60,6 +60,104 @@ export function typedToMinor(raw: string): string {
   return String(negative ? -minor : minor);
 }
 
+/* ---- inline calculator: a small, safe arithmetic evaluator ---- */
+
+/** true when the typed value holds a binary operator, not just a leading minus */
+export function hasMathOperator(text: string): boolean {
+  return /[+*/]/.test(text) || /[0-9,.)]\s*-/.test(text);
+}
+
+/**
+ * Evaluate a simple money expression like "15.000+3.500" or "20000*3".
+ * Numbers use id-ID grouping: "." groups thousands, "," is the decimal.
+ * Supports + - * / and parentheses. Returns major units, or null if invalid.
+ */
+export function evalMoneyExpr(input: string): number | null {
+  const s = input.trim();
+  if (!s) return null;
+
+  const tokens: Array<number | string> = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === " ") {
+      i++;
+      continue;
+    }
+    if ("+-*/()".includes(c)) {
+      tokens.push(c);
+      i++;
+      continue;
+    }
+    if (/[0-9.,]/.test(c)) {
+      let j = i;
+      while (j < s.length && /[0-9.,]/.test(s[j])) j++;
+      const numStr = s.slice(i, j).replace(/\./g, "").replace(",", ".");
+      const n = Number(numStr);
+      if (!Number.isFinite(n)) return null;
+      tokens.push(n);
+      i = j;
+      continue;
+    }
+    return null;
+  }
+  if (!tokens.length) return null;
+
+  const prec: Record<string, number> = { "+": 1, "-": 1, "*": 2, "/": 2 };
+  const output: Array<number | string> = [];
+  const ops: string[] = [];
+  for (let k = 0; k < tokens.length; k++) {
+    const t = tokens[k];
+    if (typeof t === "number") {
+      output.push(t);
+    } else if (t === "(") {
+      ops.push(t);
+    } else if (t === ")") {
+      while (ops.length && ops[ops.length - 1] !== "(") output.push(ops.pop()!);
+      if (!ops.length) return null;
+      ops.pop();
+    } else {
+      const prev = tokens[k - 1];
+      const prevIsValue = typeof prev === "number" || prev === ")";
+      // a "-" or "+" with no value before it is a sign: fold in a leading 0
+      if ((t === "-" || t === "+") && !prevIsValue) output.push(0);
+      while (
+        ops.length &&
+        ops[ops.length - 1] !== "(" &&
+        prec[ops[ops.length - 1]] >= prec[t]
+      ) {
+        output.push(ops.pop()!);
+      }
+      ops.push(t);
+    }
+  }
+  while (ops.length) {
+    const o = ops.pop()!;
+    if (o === "(") return null;
+    output.push(o);
+  }
+
+  const stack: number[] = [];
+  for (const t of output) {
+    if (typeof t === "number") {
+      stack.push(t);
+      continue;
+    }
+    const b = stack.pop();
+    const a = stack.pop();
+    if (a === undefined || b === undefined) return null;
+    if (t === "/" && b === 0) return null;
+    stack.push(t === "+" ? a + b : t === "-" ? a - b : t === "*" ? a * b : a / b);
+  }
+  if (stack.length !== 1 || !Number.isFinite(stack[0])) return null;
+  return stack[0];
+}
+
+/** major units -> the typed editor string, e.g. 18500 -> "18.500" */
+export function majorToTyped(major: number): string {
+  return minorToTyped(Math.round(major * MINOR));
+}
+
 /** stored minor units -> the string to seed the editor with */
 export function minorToTyped(minor: number): string {
   const negative = minor < 0;
