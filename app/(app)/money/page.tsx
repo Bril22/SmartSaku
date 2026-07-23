@@ -388,12 +388,26 @@ async function AccountsTab({ userId, spaceId, money, showAll }: Ctx & { showAll?
 
   return (
     <div className="max-w-md">
-      <div className="bg-card border border-line rounded-lg p-4 mb-5 shadow-soft">
+      <div className="bg-card border border-line rounded-lg p-4 mb-3 shadow-soft">
         <div className="text-[11px] uppercase tracking-wide text-inksoft">
           All accounts{hiddenCount > 0 ? ` · ${hiddenCount} hidden not counted` : ""}
         </div>
         <div className="font-display text-2xl font-bold money mt-0.5">{money.rp(total)}</div>
       </div>
+
+      <Link
+        href="/invest"
+        className="flex items-center gap-3 bg-goodbg rounded-lg p-3.5 mb-4 hover:shadow-soft"
+      >
+        <span className="text-xl">💎</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[13px] text-sagedeep">Wealth &amp; investments</div>
+          <div className="text-[11.5px] text-sagedeep/80">
+            Net worth, crypto (live prices), stocks and more
+          </div>
+        </div>
+        <span className="text-sagedeep">›</span>
+      </Link>
 
       <AddPanel label="Add account">
         <form action={addAccount} className="space-y-2">

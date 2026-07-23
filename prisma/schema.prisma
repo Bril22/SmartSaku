@@ -33,6 +33,7 @@ model User {
   templates    TransactionTemplate[]
   pushSubs     PushSubscription[]
   nativeTokens NativePushToken[]
+  holdings     Holding[]
 }
 
 model Space {
@@ -51,6 +52,7 @@ model Space {
   goals        Goal[]
   imports      ImportBatch[]
   templates    TransactionTemplate[]
+  holdings     Holding[]
 }
 
 model SpaceMember {
@@ -403,6 +405,25 @@ model NativePushToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Holding {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId     String?
+  space       Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  /// crypto | stock | gold | fund | other
+  kind        String   @default("crypto")
+  /// ticker for a live price, e.g. BTC (crypto only)
+  symbol      String   @default("")
+  name        String   @default("")
+  quantity    Float    @default(0)
+  /// manual valuation for non-crypto holdings, minor units IDR
+  manualValue BigInt   @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([spaceId])
 }
 
 model AppMeta {

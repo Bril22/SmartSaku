@@ -957,3 +957,59 @@ export async function clearAssumptions() {
     "/future?ok=" + encodeURIComponent("Cleared — forecast now follows your plan and debts"),
   );
 }
+
+/* ---------- investments ---------- */
+
+export async function addHolding(formData: FormData) {
+  const { userId, spaceId } = await requireSpace();
+  const kind = String(formData.get("kind") ?? "crypto");
+  if (kind === "crypto") {
+    const symbol = String(formData.get("symbol") ?? "").trim().toUpperCase().slice(0, 12);
+    const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
+    if (!symbol || !quantity) {
+      redirect("/invest?err=" + encodeURIComponent("Enter a coin and an amount"));
+    }
+    await prisma.holding.create({
+      data: { userId, spaceId, kind: "crypto", symbol, name: symbol, quantity },
+    });
+  } else {
+    const name = String(formData.get("name") ?? "").trim().slice(0, 60);
+    const value = Math.abs(Math.round(Number(formData.get("value") ?? 0)));
+    if (!name || !value) {
+      redirect("/invest?err=" + encodeURIComponent("Enter a name and a value"));
+    }
+    await prisma.holding.create({
+      data: { userId, spaceId, kind: kind.slice(0, 20), name, manualValue: BigInt(value) },
+    });
+  }
+  revalidatePath("/invest");
+  revalidatePath("/");
+  redirect("/invest?ok=" + encodeURIComponent("Holding added"));
+}
+
+export async function updateHolding(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  const existing = await prisma.holding.findFirst({ where: { id, spaceId } });
+  if (!existing) redirect("/invest");
+  if (existing!.kind === "crypto") {
+    const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
+    await prisma.holding.update({ where: { id }, data: { quantity } });
+  } else {
+    const name = String(formData.get("name") ?? "").trim().slice(0, 60) || existing!.name;
+    const value = Math.abs(Math.round(Number(formData.get("value") ?? 0)));
+    await prisma.holding.update({ where: { id }, data: { name, manualValue: BigInt(value) } });
+  }
+  revalidatePath("/invest");
+  revalidatePath("/");
+  redirect("/invest?ok=" + encodeURIComponent("Holding updated"));
+}
+
+export async function deleteHolding(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  await prisma.holding.deleteMany({ where: { id, spaceId } });
+  revalidatePath("/invest");
+  revalidatePath("/");
+  redirect("/invest?ok=" + encodeURIComponent("Holding removed"));
+}
