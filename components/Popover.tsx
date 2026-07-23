@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+type Pos = { top: number; left: number; maxH: number };
 
 export default function Popover({
   trigger,
@@ -14,10 +17,12 @@ export default function Popover({
   width?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [flipUp, setFlipUp] = useState(false);
-  const [offset, setOffset] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<Pos | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -26,7 +31,7 @@ export default function Popover({
       // component (e.g. a Select option) removes the clicked node on this event
       const path = e.composedPath();
       if (ref.current && path.includes(ref.current)) return;
-      // dropdowns render in a portal on document.body but belong to this popover
+      // the panel and any nested dropdowns live in a portal marked like this
       const inPortal = path.some(
         (n) => n instanceof HTMLElement && n.dataset.selectPortal === "true",
       );
@@ -44,40 +49,66 @@ export default function Popover({
     };
   }, [open]);
 
+  // fixed positioning off the trigger rect, so no ancestor overflow can clip it
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
       if (!panelRef.current || !ref.current) return;
-      const panel = panelRef.current.getBoundingClientRect();
       const anchor = ref.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - anchor.bottom;
-      const spaceAbove = anchor.top;
-      setFlipUp(spaceBelow < panel.height + 16 && spaceAbove > spaceBelow);
-      const maxLeft = Math.max(8, window.innerWidth - panel.width - 8);
-      const wanted = Math.min(Math.max(anchor.right - panel.width, 8), maxLeft);
-      setOffset(wanted - anchor.left);
+      const panel = panelRef.current.getBoundingClientRect();
+      const gap = 6;
+      const margin = 8;
+      const below = window.innerHeight - anchor.bottom - gap - margin;
+      const above = anchor.top - gap - margin;
+      let top: number;
+      let maxH: number;
+      if (panel.height <= below || below >= above) {
+        top = anchor.bottom + gap;
+        maxH = below;
+      } else {
+        top = Math.max(margin, anchor.top - gap - Math.min(panel.height, above));
+        maxH = above;
+      }
+      // right-align to the trigger, then clamp inside the viewport
+      const left = Math.min(
+        Math.max(margin, anchor.right - panel.width),
+        Math.max(margin, window.innerWidth - panel.width - margin),
+      );
+      setPos({ top, left, maxH: Math.max(140, maxH) });
     };
     place();
     window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="inline-block">
       <button type="button" onClick={() => setOpen((o) => !o)} className={triggerClass}>
         {trigger}
       </button>
-      {open && (
-        <div
-          ref={panelRef}
-          className={`absolute z-30 ${width} max-w-[calc(100vw-16px)] max-h-[min(70vh,420px)] overflow-y-auto overscroll-contain bg-card border border-line rounded-md p-3 shadow-[0_10px_30px_rgba(68,58,40,.18)] space-y-2 ${
-            flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } ${offset === null ? "right-0" : ""}`}
-          style={offset === null ? undefined : { left: offset }}
-        >
-          {children}
-        </div>
-      )}
+      {mounted &&
+        open &&
+        createPortal(
+          <div data-select-portal="true">
+            <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+            <div
+              ref={panelRef}
+              className={`fixed z-[70] ${width} max-w-[calc(100vw-16px)] overflow-y-auto overscroll-contain bg-card border border-line rounded-lg p-3 shadow-[0_10px_30px_rgba(68,58,40,.22)] space-y-2`}
+              style={
+                pos
+                  ? { top: pos.top, left: pos.left, maxHeight: pos.maxH }
+                  : { visibility: "hidden", top: 0, left: 0 }
+              }
+            >
+              {children}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
