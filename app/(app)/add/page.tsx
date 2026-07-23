@@ -85,6 +85,7 @@ export default async function AddPage({
         categories={categoryOptions}
         templates={templateOptions}
         allowTemplate
+        offline
         defaults={{ accountId: (accounts.find((a) => a.primary) ?? accounts[0])?.id }}
       />
     </div>

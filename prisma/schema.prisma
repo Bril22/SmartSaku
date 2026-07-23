@@ -264,6 +264,8 @@ model Transaction {
   /// groups the two legs of a transfer; not a foreign key
   transferId    String?
   kind          TxKind    @default(NORMAL)
+  /// id minted on the device for offline entries; makes syncing idempotent
+  clientId      String?   @unique
 
   @@unique([plannedId, plannedMonth])
   @@index([userId, date])

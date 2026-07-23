@@ -6,6 +6,13 @@ import MoneyInput from "@/components/MoneyInput";
 import Select, { type SelectOption } from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 import DateField from "@/components/DateField";
+import { enqueueTx } from "@/lib/txQueue";
+
+function localNow(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 export type CategoryOption = SelectOption & { type: "INCOME" | "EXPENSE" };
 
@@ -27,6 +34,7 @@ export default function TransactionForm({
   categories,
   templates = [],
   allowTemplate = false,
+  offline = false,
   defaults,
   submitLabel = "Save",
   extraFields,
@@ -36,6 +44,7 @@ export default function TransactionForm({
   categories: CategoryOption[];
   templates?: TemplateOption[];
   allowTemplate?: boolean;
+  offline?: boolean;
   defaults?: {
     direction?: "IN" | "OUT";
     amount?: number;
@@ -57,6 +66,39 @@ export default function TransactionForm({
   // bumping this remounts the uncontrolled fields, re-seeding them from a template
   const [formKey, setFormKey] = useState(0);
   const [saveTpl, setSaveTpl] = useState(false);
+  const [savedOffline, setSavedOffline] = useState(false);
+
+  // when there is no connection, keep the entry in a local queue and let
+  // OfflineSync push it to the server later. Online submits are untouched.
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!offline) return;
+    if (typeof navigator !== "undefined" && navigator.onLine) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const fd = new FormData(e.currentTarget);
+    const amount = String(fd.get("amount") ?? "");
+    const accountId = String(fd.get("accountId") ?? "");
+    if (!amount || !accountId) return;
+    enqueueTx({
+      clientId:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      amount,
+      direction: fd.get("direction") === "IN" ? "IN" : "OUT",
+      accountId,
+      categoryId: String(fd.get("categoryId") ?? "") || null,
+      note: String(fd.get("note") ?? ""),
+      date: String(fd.get("date") ?? "") || localNow(),
+      createdAt: Date.now(),
+    }).then(() => {
+      window.dispatchEvent(new Event("smartsaku:queued"));
+      setSavedOffline(true);
+      setSeed({ amount: undefined, accountId, note: "" });
+      setFormKey((k) => k + 1);
+      setTimeout(() => setSavedOffline(false), 5000);
+    });
+  };
 
   const wanted = direction === "IN" ? "INCOME" : "EXPENSE";
   const visible = categories.filter((c) => c.type === wanted);
@@ -82,8 +124,14 @@ export default function TransactionForm({
   };
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} onSubmit={handleSubmit} className="space-y-4">
       {extraFields}
+
+      {savedOffline && (
+        <div className="rounded-md bg-goodbg text-sagedeep text-[12.5px] font-semibold px-3.5 py-2.5">
+          ☁️ Saved offline. It will sync automatically when you are back online.
+        </div>
+      )}
 
       {templates.length > 0 && (
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">

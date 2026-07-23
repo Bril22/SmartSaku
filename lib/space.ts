@@ -31,16 +31,17 @@ export async function ensurePersonalSpace(userId: string): Promise<string> {
   return space.id;
 }
 
-export async function requireSpace(): Promise<ActiveSpace> {
+/** Resolve the active space, or null when not signed in. Does not redirect,
+ * so route handlers can return a clean 401 instead of an HTML redirect. */
+export async function resolveSpace(): Promise<ActiveSpace | null> {
   const session = await readSession();
-  if (!session) redirect("/login");
+  if (!session) return null;
   const { userId } = session;
-  // same query as before, but it now also enforces session revocation
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { sessionVersion: true },
   });
-  if (!user || user.sessionVersion !== session.ver) redirect("/login");
+  if (!user || user.sessionVersion !== session.ver) return null;
 
   const jar = await cookies();
   const wanted = jar.get(COOKIE)?.value;
@@ -71,6 +72,12 @@ export async function requireSpace(): Promise<ActiveSpace> {
     role: membership!.role,
     shared: memberCount > 1,
   };
+}
+
+export async function requireSpace(): Promise<ActiveSpace> {
+  const space = await resolveSpace();
+  if (!space) redirect("/login");
+  return space;
 }
 
 /**
