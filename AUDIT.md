@@ -78,8 +78,11 @@ Database checked after the fix: no unscoped rows remain in any table.
 
 ### Mobile readiness
 
-10. No offline support — every write is a server action, so a wrapped app fails without a
-    connection. This is also the biggest gap against the Indonesian competition.
+10. Offline: the app is now an installable PWA with a service worker (cache-first static assets,
+    network-first navigations, cached `/offline` fallback) and app icons. This covers install and
+    a graceful offline screen. The remaining piece is an offline *write queue* — logging a
+    transaction with no signal and syncing it later — which needs a client store and a plain sync
+    endpoint, because every write is a server action today.
 11. Cookie sessions need explicit handling inside a native WebView.
 12. No deep links, no push notifications, no biometric lock.
 13. Image import base64-loads the whole file into memory.
