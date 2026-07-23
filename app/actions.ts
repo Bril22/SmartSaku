@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
@@ -13,6 +14,8 @@ import { addMonths, formatMinor, monthKey } from "@/lib/format";
 import { parseWhen, recordTransaction } from "@/lib/tx";
 import { toNum } from "@/lib/validate";
 import { logAudit } from "@/lib/audit";
+import { PLANS, type Tier } from "@/lib/plan";
+import { createSnapTransaction, midtransConfigured } from "@/lib/midtrans";
 
 
 
@@ -1015,4 +1018,40 @@ export async function deleteHolding(formData: FormData) {
   revalidatePath("/invest");
   revalidatePath("/");
   redirect("/invest?ok=" + encodeURIComponent("Holding removed"));
+}
+
+/* ---------- premium ---------- */
+
+export async function createCheckout(formData: FormData) {
+  const { userId } = await requireSpace();
+  const tier = String(formData.get("tier") ?? "") as Tier;
+  if (!PLANS[tier]) redirect("/upgrade?err=" + encodeURIComponent("Pick a plan"));
+  if (!midtransConfigured()) {
+    redirect("/upgrade?err=" + encodeURIComponent("Payments are not set up on the server yet"));
+  }
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) redirect("/login");
+
+  const orderId = `saku-${tier}-${randomUUID()}`;
+  await prisma.payment.create({
+    data: { userId, orderId, tier, amount: PLANS[tier].price, status: "pending" },
+  });
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : "";
+
+  const result = await createSnapTransaction({
+    orderId,
+    amount: PLANS[tier].price,
+    email: user!.email,
+    name: user!.name,
+    itemName: `SmartSaku Premium — ${PLANS[tier].label}`,
+    finishUrl: `${origin}/upgrade?done=1`,
+  });
+  if (!result) {
+    redirect("/upgrade?err=" + encodeURIComponent("Could not start the payment — try again"));
+  }
+  redirect(result!.redirectUrl);
 }

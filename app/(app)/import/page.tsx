@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
 import { startImport, undoImport } from "@/app/import/actions";
+import { requirePremium } from "@/lib/plan";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function ImportPage({
@@ -10,6 +11,7 @@ export default async function ImportPage({
 }: {
   searchParams: Promise<{ from?: string }>;
 }) {
+  await requirePremium("Saku AI import");
   const { userId, spaceId } = await requireSpace();
   const { from } = await searchParams;
   const back = from === "add" ? { href: "/add", label: "Add transaction" } : { href: "/money/history", label: "History" };

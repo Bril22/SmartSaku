@@ -18,6 +18,9 @@ model User {
   /// set when the account is linked to a Google identity
   googleId     String?  @unique
   image        String?
+  /// premium entitlement: active while premiumUntil is in the future, or forever if lifetime
+  premiumUntil DateTime?
+  lifetime     Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   accounts     FinAccount[]
@@ -406,6 +409,19 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([spaceId, createdAt])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Midtrans order id, our idempotency key
+  orderId   String   @unique
+  tier      String
+  amount    Int
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model NativePushToken {

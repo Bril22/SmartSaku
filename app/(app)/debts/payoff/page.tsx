@@ -4,9 +4,11 @@ import { getMoney } from "@/lib/money";
 import { getDebtSummaries } from "@/lib/finance";
 import { monthKey } from "@/lib/format";
 import { type PayoffDebt } from "@/lib/payoff";
+import { requirePremium } from "@/lib/plan";
 import PayoffPlanner from "@/components/PayoffPlanner";
 
 export default async function PayoffPage() {
+  await requirePremium("Debt payoff planner");
   const { userId, spaceId } = await requireSpace();
   const [money, summaries] = await Promise.all([getMoney(userId), getDebtSummaries(spaceId)]);
 

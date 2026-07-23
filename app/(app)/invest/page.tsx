@@ -5,6 +5,7 @@ import { getMoney } from "@/lib/money";
 import { getDebtSummaries } from "@/lib/finance";
 import { getCryptoPrices } from "@/lib/prices";
 import { addHolding, deleteHolding, updateHolding } from "@/app/actions";
+import { requirePremium } from "@/lib/plan";
 import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
@@ -20,6 +21,7 @@ const MANUAL_KINDS = [
 const kindMeta = (v: string) => MANUAL_KINDS.find((k) => k.value === v) ?? MANUAL_KINDS[3];
 
 export default async function InvestPage() {
+  await requirePremium("Investments & net worth");
   const { userId, spaceId } = await requireSpace();
   const [money, holdings, accounts, debts, prices] = await Promise.all([
     getMoney(userId),

@@ -15,6 +15,7 @@ import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 import NotificationSettings from "@/components/NotificationSettings";
 import { pushConfigured } from "@/lib/push";
+import { isPremiumUser } from "@/lib/plan";
 
 export default async function SettingsPage() {
   const userId = await requireUserId();
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.settings.findUnique({ where: { userId } }),
   ]);
+  const premium = user ? isPremiumUser(user) : false;
 
   return (
     <div className="max-w-md">
@@ -44,6 +46,24 @@ export default async function SettingsPage() {
           </SubmitButton>
         </form>
       </div>
+
+      <Link
+        href="/upgrade"
+        className={`flex items-center gap-3 rounded-lg p-4 mb-4 ${
+          premium ? "bg-goodbg" : "bg-sagedeep text-cream2"
+        }`}
+      >
+        <span className="text-xl">{premium ? "⭐" : "💎"}</span>
+        <div className="flex-1">
+          <div className="font-bold text-[13.5px]">
+            {premium ? "SmartSaku Premium" : "Upgrade to Premium"}
+          </div>
+          <div className={`text-[11.5px] ${premium ? "text-sagedeep/80" : "text-cream2/80"}`}>
+            {premium ? "AI, investments and the payoff planner are unlocked" : "AI, investments and the debt payoff planner"}
+          </div>
+        </div>
+        <span className={premium ? "text-sagedeep" : "text-cream2"}>›</span>
+      </Link>
 
       <h2 className="text-sm font-bold mb-2">Display currency</h2>
       <form action={updateCurrency} className="bg-card border border-line rounded-lg p-4 mb-4 space-y-3">

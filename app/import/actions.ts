@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
+import { getPremium } from "@/lib/plan";
 import {
   aiExtractTransactions,
   extractFileText,
@@ -22,6 +23,7 @@ import {
 
 export async function startImport(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
+  if (!(await getPremium(userId))) redirect("/upgrade?from=" + encodeURIComponent("Saku AI import"));
   const aiLimit = await rateLimit(`ai:import:${userId}`, 15, 3600);
   if (!aiLimit.ok) {
     redirect("/import?err=" + encodeURIComponent("Too many AI scans — try again shortly"));

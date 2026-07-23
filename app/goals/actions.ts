@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireOwner, requireSpace } from "@/lib/space";
 import { getSessionUserId } from "@/lib/auth";
+import { getPremium } from "@/lib/plan";
 import { getDebtSummaries } from "@/lib/finance";
 import { MINOR, monthLabel } from "@/lib/format";
 
@@ -212,6 +213,7 @@ async function goalContext(userId: string, spaceId: string, id: string) {
 
 export async function askGoalAdvice(formData: FormData) {
   const { userId, spaceId } = await requireSpace();
+  if (!(await getPremium(userId))) redirect("/upgrade?from=" + encodeURIComponent("AI consultant"));
   const aiLimit = await rateLimit(`ai:askGoalAdvice:${userId}`, 10, 3600);
   if (!aiLimit.ok) {
     redirect("/future?err=" + encodeURIComponent("Too many AI requests — try again shortly"));
