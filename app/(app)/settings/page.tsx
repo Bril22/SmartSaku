@@ -13,6 +13,8 @@ import {
 } from "@/app/settings/actions";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
+import NotificationSettings from "@/components/NotificationSettings";
+import { pushConfigured } from "@/lib/push";
 
 export default async function SettingsPage() {
   const userId = await requireUserId();
@@ -96,6 +98,17 @@ export default async function SettingsPage() {
           Apply
         </SubmitButton>
       </form>
+
+      <h2 className="text-sm font-bold mb-2">Notifications</h2>
+      <NotificationSettings
+        vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
+        configured={pushConfigured()}
+        prefs={{
+          notifyDaily: settings?.notifyDaily ?? false,
+          notifyDebts: settings?.notifyDebts ?? true,
+          notifyHour: settings?.notifyHour ?? 20,
+        }}
+      />
 
       <div className="bg-card border border-line rounded-lg divide-y divide-line mb-4">
         <Link href="/settings/spaces" className="px-4 py-3.5 flex items-center gap-3">

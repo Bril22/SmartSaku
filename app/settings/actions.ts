@@ -9,6 +9,7 @@ import { requireOwner, requireSpace } from "@/lib/space";
 import { createSession, destroySession, revokeSessions } from "@/lib/auth";
 import { CURRENCIES } from "@/lib/money";
 import { normaliseStartDay } from "@/lib/format";
+import { sendToUser } from "@/lib/push";
 
 
 
@@ -245,6 +246,55 @@ export async function deleteCategory(formData: FormData) {
   await prisma.category.deleteMany({ where: { id, spaceId } });
   revalidatePath("/", "layout");
   back("/settings/categories", "Category deleted — its transactions are kept");
+}
+
+export async function savePushSubscription(formData: FormData) {
+  const { userId } = await requireSpace();
+  const endpoint = String(formData.get("endpoint") ?? "");
+  const p256dh = String(formData.get("p256dh") ?? "");
+  const auth = String(formData.get("auth") ?? "");
+  const userAgent = String(formData.get("userAgent") ?? "").slice(0, 200);
+  if (!endpoint || !p256dh || !auth) return;
+  await prisma.pushSubscription.upsert({
+    where: { endpoint },
+    update: { userId, p256dh, auth, userAgent },
+    create: { userId, endpoint, p256dh, auth, userAgent },
+  });
+}
+
+export async function removePushSubscription(formData: FormData) {
+  const { userId } = await requireSpace();
+  const endpoint = String(formData.get("endpoint") ?? "");
+  if (!endpoint) return;
+  await prisma.pushSubscription.deleteMany({ where: { endpoint, userId } });
+}
+
+export async function updateNotifyPrefs(formData: FormData) {
+  const { userId } = await requireSpace();
+  const notifyDaily = formData.get("notifyDaily") === "1";
+  const notifyDebts = formData.get("notifyDebts") === "1";
+  const notifyHour = Math.min(23, Math.max(0, Math.round(Number(formData.get("notifyHour") ?? 20))));
+  const notifyTz = (String(formData.get("notifyTz") ?? "").slice(0, 60)) || "Asia/Jakarta";
+  await prisma.settings.upsert({
+    where: { userId },
+    update: { notifyDaily, notifyDebts, notifyHour, notifyTz },
+    create: { userId, notifyDaily, notifyDebts, notifyHour, notifyTz },
+  });
+  back("/settings", "Notification settings saved");
+}
+
+export async function sendTestNotification() {
+  const { userId } = await requireSpace();
+  const delivered = await sendToUser(userId, {
+    title: "SmartSaku 🌱",
+    body: "Notifications are on. We will remind you about bills and daily logging.",
+    url: "/",
+    tag: "test",
+  });
+  back(
+    "/settings",
+    delivered > 0 ? "Test sent — check your device" : "No device is subscribed on this account yet",
+  );
 }
 
 export async function updateMonthStart(formData: FormData) {

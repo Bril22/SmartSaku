@@ -31,6 +31,7 @@ model User {
   goals        Goal[]
   memberships  SpaceMember[]
   templates    TransactionTemplate[]
+  pushSubs     PushSubscription[]
 }
 
 model Space {
@@ -353,6 +354,34 @@ model Settings {
   salaryGrowthPct Float  @default(5)
   inflationPct    Float  @default(3)
   savingsRatePct  Float  @default(2)
+  // notification preferences
+  notifyDaily     Boolean @default(false)
+  notifyHour      Int     @default(20)
+  notifyTz        String  @default("Asia/Jakarta")
+  notifyDebts     Boolean @default(true)
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model NotificationLog {
+  id     String   @id @default(cuid())
+  userId String
+  /// dedupe key, e.g. "daily:2026-07-23" or "debt:<id>:2026-07"
+  kind   String
+  sentAt DateTime @default(now())
+
+  @@unique([userId, kind])
 }
 
 model AppMeta {
