@@ -138,7 +138,7 @@ export default async function HomePage() {
       <div className="bg-card border border-line rounded-lg p-4 mb-5">
         <div className="flex items-baseline justify-between mb-2">
           <h2 className="text-sm font-bold">Spending by category ({monthLabel(now)})</h2>
-          <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
+          <Link href="/money/history" className="text-xs font-bold text-sagedeep">
             History
           </Link>
         </div>

@@ -30,14 +30,9 @@ export default async function AddPage({
     <div className="max-w-md mx-auto">
       <div className="flex items-baseline justify-between mb-5">
         <h1 className="font-display text-2xl font-semibold">Add transaction</h1>
-        <div className="flex items-center gap-3">
-          <Link href="/import" className="text-xs font-bold text-sagedeep">
-            📄 Scan file
-          </Link>
-          <Link href="/money/transfer" className="text-xs font-bold text-sagedeep">
-            ⇄ Transfer
-          </Link>
-        </div>
+        <Link href="/money/transfer" className="text-xs font-bold text-sagedeep">
+          ⇄ Transfer
+        </Link>
       </div>
       {error && (
         <div className="bg-badbg text-bad rounded-md px-4 py-3 text-sm font-semibold mb-4">
@@ -45,7 +40,7 @@ export default async function AddPage({
         </div>
       )}
       <Link
-        href="/import"
+        href="/import?from=add"
         className="flex items-center gap-3 bg-card border border-line rounded-lg p-3.5 mb-4 hover:border-sagedeep"
       >
         <span className="text-xl">📄</span>

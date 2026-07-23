@@ -5,8 +5,14 @@ import { requireSpace } from "@/lib/space";
 import { startImport, undoImport } from "@/app/import/actions";
 import SubmitButton from "@/components/SubmitButton";
 
-export default async function ImportPage() {
+export default async function ImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { userId, spaceId } = await requireSpace();
+  const { from } = await searchParams;
+  const back = from === "add" ? { href: "/add", label: "Add transaction" } : { href: "/money/history", label: "History" };
   const recent = await prisma.importBatch.findMany({
     where: { spaceId, status: { in: ["DONE", "REVERTED"] } },
     orderBy: { createdAt: "desc" },
@@ -20,8 +26,8 @@ export default async function ImportPage() {
   const countBy = new Map(txCounts.map((t) => [t.importBatchId, t._count._all]));
   return (
     <div className="max-w-md mx-auto">
-      <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
-        ‹ History
+      <Link href={back.href} className="text-xs font-bold text-sagedeep">
+        ‹ {back.label}
       </Link>
       <h1 className="font-display text-2xl font-semibold mt-1 mb-2">Import from file</h1>
       <p className="text-sm text-inksoft mb-5">

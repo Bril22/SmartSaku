@@ -146,7 +146,7 @@ export default async function FuturePage({
           <input type="hidden" name="years" value={years} />
           <div>
             <label className="block text-[11px] font-semibold text-inksoft mb-1">
-              🔮 Check a specific date
+              Check a specific date
             </label>
             <DateField name="on" defaultValue={on ?? ""} required title="Check a specific date" />
           </div>

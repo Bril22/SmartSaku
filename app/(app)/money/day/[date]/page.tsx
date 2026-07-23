@@ -50,7 +50,7 @@ export default async function DayPage({
 
   return (
     <div className="max-w-md">
-      <Link href="/money?tab=history" className="text-xs font-bold text-sagedeep">
+      <Link href="/money/history" className="text-xs font-bold text-sagedeep">
         ‹ History
       </Link>
       <h1 className="font-display text-2xl font-semibold mt-1 mb-1">{label}</h1>

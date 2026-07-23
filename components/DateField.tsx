@@ -452,13 +452,6 @@ export default function DateField({
             <span className="text-[11px] font-bold uppercase tracking-wide text-inksoft">
               {title ?? ph}
             </span>
-            <button
-              type="button"
-              onClick={close}
-              className="text-[11px] font-extrabold text-sagedeep px-2 py-1"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
