@@ -131,6 +131,12 @@ model Debt {
   lender    String
   color     String     @default("#E8A07C")
   status    DebtStatus @default(ACTIVE)
+  /// annual interest rate, percent (for the payoff engine)
+  aprPct    Float      @default(0)
+  /// minimum monthly payment, minor units (snowball/avalanche floor)
+  minPayment BigInt    @default(0)
+  /// bank | card | paylater | pinjol | kpr | vehicle | personal | other
+  kind      String     @default("other")
   createdAt DateTime   @default(now())
 
   spaceId     String?

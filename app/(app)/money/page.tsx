@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
 import { appliesIn, getDebtSummaries } from "@/lib/finance";
+import { DEBT_KINDS } from "@/lib/payoff";
 import { monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import {
@@ -562,6 +563,30 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
               />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] font-semibold text-inksoft mb-1">Type</label>
+              <Select
+                name="kind"
+                label="Type"
+                defaultValue="other"
+                options={DEBT_KINDS.map((k) => ({ value: k.value, label: k.label, icon: k.icon }))}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-inksoft mb-1">
+                Interest %/year
+              </label>
+              <input
+                name="aprPct"
+                type="number"
+                step="0.1"
+                min={0}
+                placeholder="0"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right"
+              />
+            </div>
+          </div>
           <div>
             <label className="block text-[11px] font-semibold text-inksoft mb-1">First payment month</label>
             <DateField name="start" mode="month" placeholder="Pick a month" title="First payment month" />
@@ -574,6 +599,22 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
           </SubmitButton>
         </form>
       </AddPanel>
+
+      {totalRemaining > 0 && (
+        <Link
+          href="/debts/payoff"
+          className="flex items-center gap-3 bg-goodbg rounded-lg p-3.5 mb-4 hover:shadow-soft"
+        >
+          <span className="text-xl">🎯</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-[13px] text-sagedeep">Payoff planner</div>
+            <div className="text-[11.5px] text-sagedeep/80">
+              Snowball vs avalanche, and what paying extra saves you
+            </div>
+          </div>
+          <span className="text-sagedeep">›</span>
+        </Link>
+      )}
 
       <div className="bg-card border border-line rounded-lg p-4 mb-4 shadow-soft">
         <div className="flex items-baseline justify-between mb-1">

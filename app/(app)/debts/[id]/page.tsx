@@ -12,10 +12,13 @@ import {
   deleteDebtPayment,
   deleteScheduleEntry,
   renameDebt,
+  updateDebtDetails,
   updateDebtPayment,
   updateScheduleEntry,
 } from "@/app/actions";
+import { DEBT_KINDS, debtKind } from "@/lib/payoff";
 import MoneyInput from "@/components/MoneyInput";
+import Select from "@/components/Select";
 import PayForm from "@/components/PayForm";
 import Popover from "@/components/Popover";
 import DateField from "@/components/DateField";
@@ -70,10 +73,66 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         />
         <button className="text-[11px] font-extrabold text-sagedeep shrink-0">Rename</button>
       </form>
-      <p className="text-sm text-inksoft mb-4">
+      <p className="text-sm text-inksoft mb-1">
         Remaining <b className="money text-ink">{money.rp(remaining)}</b>
         {remaining <= 0 && <span className="text-good font-bold"> — Lunas! 🎉</span>}
       </p>
+      <p className="text-[12px] text-inksoft mb-4 flex items-center gap-2 flex-wrap">
+        <span>
+          {debtKind(debt.kind).icon} {debtKind(debt.kind).label}
+        </span>
+        {debt.aprPct > 0 && <span>· {debt.aprPct}% / year</span>}
+        {Number(debt.minPayment) > 0 && <span>· min {money.rpShort(Number(debt.minPayment))}/mo</span>}
+      </p>
+
+      {/* loan details for the payoff engine */}
+      <details className="mb-4">
+        <summary className="text-xs font-bold text-sagedeep cursor-pointer">
+          💳 Loan details (rate, minimum, type)
+        </summary>
+        <form action={updateDebtDetails} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2.5">
+          <input type="hidden" name="debtId" value={debt.id} />
+          <Select
+            name="kind"
+            label="Type"
+            defaultValue={debt.kind}
+            options={DEBT_KINDS.map((k) => ({ value: k.value, label: k.label, icon: k.icon }))}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10.5px] font-bold text-inksoft mb-1">
+                Interest %/year
+              </label>
+              <input
+                name="aprPct"
+                type="number"
+                step="0.1"
+                min={0}
+                defaultValue={debt.aprPct || ""}
+                placeholder="0"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right"
+              />
+            </div>
+            <div>
+              <label className="block text-[10.5px] font-bold text-inksoft mb-1">
+                Min payment / month
+              </label>
+              <MoneyInput
+                name="minPayment"
+                defaultValue={Number(debt.minPayment) || undefined}
+                placeholder="0"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+            </div>
+          </div>
+          <p className="text-[10.5px] text-inksoft">
+            The payoff planner uses these. Leave the rate at 0 for interest-free debts.
+          </p>
+          <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-4 py-2">
+            Save loan details
+          </button>
+        </form>
+      </details>
 
       {/* adjust */}
       <details className="mb-5">

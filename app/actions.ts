@@ -541,9 +541,20 @@ export async function addDebt(formData: FormData) {
   const now = new Date();
   const [sy, sm] = startRaw.split("-").map(Number);
   const start = sy && sm ? new Date(Date.UTC(sy, sm - 1, 1)) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const aprPct = Math.max(0, Number(formData.get("aprPct") ?? 0)) || 0;
+  const minPayment = Math.abs(Math.round(Number(formData.get("minPayment") ?? 0))) || monthly;
+  const kind = String(formData.get("kind") ?? "other").slice(0, 20) || "other";
   const count = await prisma.debt.count({ where: { spaceId } });
   const debt = await prisma.debt.create({
-    data: { userId, spaceId, lender, color: DEBT_COLORS[count % DEBT_COLORS.length] },
+    data: {
+      userId,
+      spaceId,
+      lender,
+      color: DEBT_COLORS[count % DEBT_COLORS.length],
+      aprPct,
+      minPayment: BigInt(minPayment),
+      kind,
+    },
   });
   const rows = [];
   let left = total;
@@ -633,6 +644,22 @@ export async function renameDebt(formData: FormData) {
   await prisma.debt.update({ where: { id: debtId }, data: { lender } });
   revalidatePath("/", "layout");
   redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Debt renamed"));
+}
+
+export async function updateDebtDetails(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const debtId = String(formData.get("debtId") ?? "");
+  const debt = await prisma.debt.findFirst({ where: { id: debtId, spaceId } });
+  if (!debt) redirect("/money?tab=debts");
+  const aprPct = Math.min(1000, Math.max(0, Number(formData.get("aprPct") ?? 0))) || 0;
+  const minPayment = Math.abs(Math.round(Number(formData.get("minPayment") ?? 0)));
+  const kind = String(formData.get("kind") ?? "other").slice(0, 20) || "other";
+  await prisma.debt.update({
+    where: { id: debtId },
+    data: { aprPct, minPayment: BigInt(minPayment), kind },
+  });
+  revalidatePath("/", "layout");
+  redirect(`/debts/${debtId}?ok=` + encodeURIComponent("Loan details updated"));
 }
 
 export async function deleteDebt(formData: FormData) {

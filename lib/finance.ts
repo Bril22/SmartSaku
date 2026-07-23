@@ -25,6 +25,9 @@ export type DebtSummary = {
   thisMonthPaid: number;
   thisMonthStatus: "PAID" | "PARTIAL" | "SKIPPED" | "DUE" | "NONE";
   progressPct: number;
+  aprPct: number;
+  minPayment: number;
+  kind: string;
 };
 
 export async function getDebtSummaries(spaceId: string): Promise<DebtSummary[]> {
@@ -91,6 +94,9 @@ export async function getDebtSummaries(spaceId: string): Promise<DebtSummary[]> 
       thisMonthPaid,
       thisMonthStatus,
       progressPct,
+      aprPct: d.aprPct,
+      minPayment: Number(d.minPayment),
+      kind: d.kind,
     };
   });
 }
