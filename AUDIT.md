@@ -78,12 +78,14 @@ Database checked after the fix: no unscoped rows remain in any table.
 
 ### Mobile readiness
 
-10. Offline: the app is now an installable PWA with a service worker (cache-first static assets,
-    network-first navigations, cached `/offline` fallback) and app icons. This covers install and
-    a graceful offline screen. The remaining piece is an offline *write queue* — logging a
-    transaction with no signal and syncing it later — which needs a client store and a plain sync
-    endpoint, because every write is a server action today.
-11. Cookie sessions need explicit handling inside a native WebView.
+10. Offline: done for the core flow. The app is an installable PWA (service worker, `/offline`
+    fallback, icons), and adding a transaction now works with no connection — the entry is queued
+    in IndexedDB and synced to `POST /api/tx` on reconnect, with a `clientId` making the sync
+    idempotent. Transfers, debt payments and edits still need a connection (they touch balances
+    and undo flows); queueing those is a possible follow-up.
+11. Cookie sessions inside a native WebView: the Capacitor shell is scaffolded (see
+    [CAPACITOR.md](CAPACITOR.md)); it loads the deployed site, so the JWT cookie persists in the
+    web view and sign-in works. Native push (APNs/FCM) is the remaining native piece.
 12. No deep links, no push notifications, no biometric lock.
 13. Image import base64-loads the whole file into memory.
 
