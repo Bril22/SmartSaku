@@ -20,6 +20,7 @@ import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 import DateField from "@/components/DateField";
+import AddPanel from "@/components/AddPanel";
 
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
 
@@ -150,6 +151,48 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
   }) => (
     <section className="mb-6">
       <h2 className="text-sm font-bold mb-2">{title}</h2>
+      <AddPanel label={`Add planned ${direction === "IN" ? "income" : "expense"}`}>
+        <form action={addPlanned} className="space-y-2">
+          <input type="hidden" name="direction" value={direction} />
+          <input
+            name="name"
+            required
+            maxLength={40}
+            placeholder={direction === "IN" ? "Salary from BCA" : "Rent, electricity, …"}
+            className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
+          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <MoneyInput
+                name="amount"
+                required
+                placeholder="5.000.000,00"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+            </div>
+            <div>
+              <input
+                name="dayOfMonth"
+                type="number"
+                min={1}
+                max={28}
+                defaultValue={1}
+                title="Day of month"
+                className="w-16 rounded-md border border-line bg-cream2 px-2 py-2.5 text-sm text-center"
+              />
+            </div>
+          </div>
+          <Select name="accountId" placeholder="Any account" options={[{ value: "", label: "Any account" }, ...accountOptions]} />
+          <Select name="categoryId" placeholder="No category" options={catOptions(direction === "IN" ? "INCOME" : "EXPENSE")} />
+          <RepeatPicker />
+          <SubmitButton
+            className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+            pendingText="Adding…"
+          >
+            Add to plan
+          </SubmitButton>
+        </form>
+      </AddPanel>
       <div className="space-y-2">
         {list.length === 0 && (
           <div className="text-[12.5px] text-inksoft bg-card border border-line rounded-md p-3.5">
@@ -263,51 +306,6 @@ async function PlanTab({ userId, spaceId, money }: Ctx) {
           );
         })}
       </div>
-      <details className="mt-2.5">
-        <summary className="text-xs font-bold text-sagedeep cursor-pointer">
-          + Add planned {direction === "IN" ? "income" : "expense"}
-        </summary>
-        <form action={addPlanned} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2">
-          <input type="hidden" name="direction" value={direction} />
-          <input
-            name="name"
-            required
-            maxLength={40}
-            placeholder={direction === "IN" ? "Salary from BCA" : "Rent, electricity, …"}
-            className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
-          />
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <MoneyInput
-                name="amount"
-                required
-                placeholder="5.000.000,00"
-                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
-              />
-            </div>
-            <div>
-              <input
-                name="dayOfMonth"
-                type="number"
-                min={1}
-                max={28}
-                defaultValue={1}
-                title="Day of month"
-                className="w-16 rounded-md border border-line bg-cream2 px-2 py-2.5 text-sm text-center"
-              />
-            </div>
-          </div>
-          <Select name="accountId" placeholder="Any account" options={[{ value: "", label: "Any account" }, ...accountOptions]} />
-          <Select name="categoryId" placeholder="No category" options={catOptions(direction === "IN" ? "INCOME" : "EXPENSE")} />
-          <RepeatPicker />
-          <SubmitButton
-            className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
-            pendingText="Adding…"
-          >
-            Add to plan
-          </SubmitButton>
-        </form>
-      </details>
     </section>
   );
 
@@ -396,6 +394,45 @@ async function AccountsTab({ userId, spaceId, money, showAll }: Ctx & { showAll?
         <div className="font-display text-2xl font-bold money mt-0.5">{money.rp(total)}</div>
       </div>
 
+      <AddPanel label="Add account">
+        <form action={addAccount} className="space-y-2">
+          <input type="hidden" name="backTo" value="/money" />
+          <input
+            name="name"
+            placeholder="Account name (e.g. BCA)"
+            required
+            className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Select
+                name="type"
+                defaultValue="BANK"
+                options={[
+                  { value: "BANK", label: "Bank", icon: "🏦" },
+                  { value: "SAVINGS", label: "Savings", icon: "🌱" },
+                  { value: "EWALLET", label: "E-wallet", icon: "📱" },
+                  { value: "CASH", label: "Cash", icon: "💵" },
+                ]}
+              />
+            </div>
+            <div className="flex-1">
+              <MoneyInput
+                name="balance"
+                placeholder="Balance"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right"
+              />
+            </div>
+          </div>
+          <SubmitButton
+            className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-4 py-2"
+            pendingText="…"
+          >
+            Create
+          </SubmitButton>
+        </form>
+      </AddPanel>
+
       <div className="space-y-2 mb-4">
         {visible.map((a) => (
           <details key={a.id} className="bg-card border border-line rounded-md group">
@@ -459,45 +496,6 @@ async function AccountsTab({ userId, spaceId, money, showAll }: Ctx & { showAll?
         )}
       </div>
 
-      <details className="mb-2">
-        <summary className="text-xs font-bold text-sagedeep cursor-pointer">+ Add account</summary>
-        <form action={addAccount} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2">
-          <input type="hidden" name="backTo" value="/money" />
-          <input
-            name="name"
-            placeholder="Account name (e.g. BCA)"
-            required
-            className="w-full rounded-md border border-line bg-cream2 px-3 py-2 text-sm"
-          />
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Select
-                name="type"
-                defaultValue="BANK"
-                options={[
-                  { value: "BANK", label: "Bank", icon: "🏦" },
-                  { value: "SAVINGS", label: "Savings", icon: "🌱" },
-                  { value: "EWALLET", label: "E-wallet", icon: "📱" },
-                  { value: "CASH", label: "Cash", icon: "💵" },
-                ]}
-              />
-            </div>
-            <div className="flex-1">
-              <MoneyInput
-                name="balance"
-                placeholder="Balance"
-                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right"
-              />
-            </div>
-          </div>
-          <SubmitButton
-            className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-4 py-2"
-            pendingText="…"
-          >
-            Create
-          </SubmitButton>
-        </form>
-      </details>
       <p className="text-[11.5px] text-inksoft">
         Rename, archive, or delete accounts in{" "}
         <Link href="/settings/accounts" className="text-sagedeep font-bold">
@@ -531,13 +529,63 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
       return { label: monthLabel(new Date(t)), debt: Math.round(running) };
     });
 
+  const monthlyDue = debts.reduce((a, d) => a + d.thisMonthPlanned, 0);
+
   return (
     <div>
+      <AddPanel label="Add debt">
+        <form action={addDebt} className="space-y-2.5">
+          <input
+            name="lender"
+            required
+            maxLength={40}
+            placeholder="Lender name (e.g. KTA Bank Biru)"
+            className="w-full rounded-md border border-line bg-cream2 px-3.5 py-2.5 text-sm"
+          />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] font-semibold text-inksoft mb-1">Total remaining</label>
+              <MoneyInput
+                name="total"
+                required
+                placeholder="12.000.000,00"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-inksoft mb-1">Monthly payment</label>
+              <MoneyInput
+                name="monthly"
+                required
+                placeholder="1.000.000,00"
+                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-inksoft mb-1">First payment month</label>
+            <DateField name="start" mode="month" placeholder="Pick a month" title="First payment month" />
+          </div>
+          <SubmitButton
+            className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+            pendingText="Adding…"
+          >
+            Add debt
+          </SubmitButton>
+        </form>
+      </AddPanel>
+
       <div className="bg-card border border-line rounded-lg p-4 mb-4 shadow-soft">
         <div className="flex items-baseline justify-between mb-1">
           <div className="text-[11px] uppercase tracking-wide text-inksoft">Total remaining</div>
           <div className="font-extrabold money text-peachdeep">{money.rpShort(totalRemaining)}</div>
         </div>
+        {monthlyDue > 0 && (
+          <div className="flex items-baseline justify-between mb-2 pb-2 border-b border-line">
+            <div className="text-[11px] uppercase tracking-wide text-inksoft">To pay this month</div>
+            <div className="font-extrabold money text-ink">{money.rp(monthlyDue)}</div>
+          </div>
+        )}
         {curve.length > 0 ? (
           <DebtCurve
             data={curve}
@@ -584,48 +632,6 @@ async function DebtsTab({ userId, spaceId, money }: Ctx) {
           );
         })}
       </div>
-      <details className="mt-4 max-w-md">
-        <summary className="text-xs font-bold text-sagedeep cursor-pointer">+ Add debt</summary>
-        <form action={addDebt} className="bg-card border border-line rounded-md p-3.5 mt-2 space-y-2.5">
-          <input
-            name="lender"
-            required
-            maxLength={40}
-            placeholder="Lender name (e.g. KTA Bank Biru)"
-            className="w-full rounded-md border border-line bg-cream2 px-3.5 py-2.5 text-sm"
-          />
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-[11px] font-semibold text-inksoft mb-1">Total remaining</label>
-              <MoneyInput
-                name="total"
-                required
-                placeholder="12.000.000,00"
-                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-inksoft mb-1">Monthly payment</label>
-              <MoneyInput
-                name="monthly"
-                required
-                placeholder="1.000.000,00"
-                className="w-full rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm text-right money"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-inksoft mb-1">First payment month</label>
-            <DateField name="start" mode="month" placeholder="Pick a month" title="First payment month" />
-          </div>
-          <SubmitButton
-            className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
-            pendingText="Adding…"
-          >
-            Add debt
-          </SubmitButton>
-        </form>
-      </details>
       <p className="text-[11.5px] text-inksoft mt-3">
         Open a debt to see every month&apos;s payment, edit or remove payments, rename it, and
         adjust the balance — the forecast updates automatically.

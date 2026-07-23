@@ -14,6 +14,9 @@ import Popover from "@/components/Popover";
 import Select from "@/components/Select";
 import SubmitButton from "@/components/SubmitButton";
 import AccountOrder from "@/components/AccountOrder";
+import AddPanel from "@/components/AddPanel";
+import Collapsible from "@/components/Collapsible";
+import EditableCard from "@/components/EditableCard";
 
 const TYPE_ICON: Record<string, string> = { BANK: "🏦", SAVINGS: "🌱", EWALLET: "📱", CASH: "💵" };
 
@@ -38,48 +41,118 @@ export default async function ManageAccountsPage() {
       <Link href="/settings" className="text-xs font-bold text-sagedeep">
         ‹ Settings
       </Link>
-      <h1 className="font-display text-2xl font-semibold mt-1 mb-1">Manage accounts</h1>
-      <p className="text-[12px] text-inksoft mb-4">
-        Drag the handle (or use the arrows) to set the order you see everywhere. The main account
-        is picked first on new transactions.
-      </p>
+      <h1 className="font-display text-2xl font-semibold mt-1 mb-4">Manage accounts</h1>
 
-      <AccountOrder
-        items={accounts
-          .filter((a) => !a.archived)
-          .map((a) => ({
-            id: a.id,
-            name: a.name,
-            icon: TYPE_ICON[a.type],
-            balance: money.rp(Number(a.balance)),
-            hidden: a.hidden,
-            primary: a.primary,
-          }))}
-      />
+      <AddPanel label="Add account">
+        <form action={addAccount} className="space-y-2.5">
+          <input type="hidden" name="backTo" value="/settings/accounts" />
+          <input
+            name="name"
+            required
+            placeholder="Account name (e.g. BCA)"
+            maxLength={40}
+            className="w-full rounded-md border border-line bg-cream2 px-3.5 py-2.5 text-sm"
+          />
+          <div className="flex gap-2.5">
+            <div className="flex-1">
+              <Select
+                name="type"
+                defaultValue="BANK"
+                options={[
+                  { value: "BANK", label: "Bank", icon: "🏦" },
+                  { value: "SAVINGS", label: "Savings", icon: "🌱" },
+                  { value: "EWALLET", label: "E-wallet", icon: "📱" },
+                  { value: "CASH", label: "Cash", icon: "💵" },
+                ]}
+              />
+            </div>
+            <div className="flex-1">
+              <MoneyInput
+                name="balance"
+                placeholder="Starting balance"
+                className="w-full rounded-md border border-line bg-cream2 px-3.5 py-3 text-sm text-right money"
+              />
+            </div>
+          </div>
+          <SubmitButton
+            className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+            pendingText="Creating…"
+          >
+            Create account
+          </SubmitButton>
+        </form>
+      </AddPanel>
 
-      <h2 className="text-sm font-bold mt-6 mb-2">Account details</h2>
-      <div className="space-y-2.5">
+      <div className="mb-5">
+        <Collapsible label="↕ Reorder accounts">
+          <p className="text-[11.5px] text-inksoft mb-2">
+            Drag the handle or use the arrows. This is the order you see everywhere.
+          </p>
+          <AccountOrder
+            items={accounts
+              .filter((a) => !a.archived)
+              .map((a) => ({
+                id: a.id,
+                name: a.name,
+                icon: TYPE_ICON[a.type],
+                balance: money.rp(Number(a.balance)),
+                hidden: a.hidden,
+                primary: a.primary,
+              }))}
+          />
+        </Collapsible>
+      </div>
+
+      <h2 className="text-sm font-bold mb-2">Accounts</h2>
+      <p className="text-[11.5px] text-inksoft mb-2.5">Tap an account to rename, adjust the balance, or delete it.</p>
+      <div className="space-y-2">
         {accounts.map((a) => {
           const txCount = txBy.get(a.id) ?? 0;
           return (
-            <div
+            <EditableCard
               key={a.id}
-              className={`bg-card border border-line rounded-lg p-4 ${a.archived ? "opacity-60" : ""}`}
+              summary={
+                <span className={`flex items-center gap-2.5 ${a.archived ? "opacity-60" : ""}`}>
+                  <span className="text-lg">{TYPE_ICON[a.type]}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="font-bold text-[14px] flex items-center gap-1.5">
+                      <span className="truncate">{a.name}</span>
+                      {a.primary && <span className="text-sagedeep text-[11px]">★</span>}
+                      {a.hidden && (
+                        <span className="text-[9px] font-extrabold text-inksoft bg-cream2 rounded-full px-1.5 py-0.5">
+                          HIDDEN
+                        </span>
+                      )}
+                      {a.archived && (
+                        <span className="text-[9px] font-extrabold text-earth bg-warnbg rounded-full px-1.5 py-0.5">
+                          ARCHIVED
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-[11px] text-inksoft">
+                      {txCount} transaction{txCount === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <span className="font-extrabold money text-[13px] whitespace-nowrap">
+                    {money.rp(Number(a.balance))}
+                  </span>
+                </span>
+              }
             >
-              <form action={renameFinAccount} className="flex items-center gap-2.5 mb-2">
-                <span className="text-lg">{TYPE_ICON[a.type]}</span>
+              <form action={renameFinAccount} className="flex items-center gap-2.5 mb-3">
                 <input type="hidden" name="id" value={a.id} />
                 <input
                   name="name"
                   defaultValue={a.name}
                   maxLength={40}
-                  className="flex-1 font-bold text-[14px] bg-transparent border-b border-transparent focus:border-line focus:outline-none min-w-0"
+                  className="flex-1 rounded-md border border-line bg-cream2 px-3 py-2 text-sm min-w-0"
                 />
                 <SubmitButton className="text-[11px] font-extrabold text-sagedeep" pendingText="…">
                   Rename
                 </SubmitButton>
               </form>
-              <div className="flex flex-wrap items-center gap-2 mb-2.5">
+
+              <div className="flex flex-wrap items-center gap-2 mb-3">
                 <Popover
                   trigger={`${money.rp(Number(a.balance))} ✎`}
                   triggerClass="font-extrabold money text-[12.5px] border-b border-dashed border-earth/50"
@@ -152,117 +225,74 @@ export default async function ManageAccountsPage() {
                   </form>
                 )}
               </div>
-              <div className="flex items-center justify-between text-[11.5px] text-inksoft">
-                <span>
-                  {txCount} transaction{txCount === 1 ? "" : "s"}
-                  {a.archived && " · archived"}
-                </span>
-                <span className="flex gap-3">
-                  <form action={toggleArchiveAccount}>
+
+              <div className="flex items-center justify-end gap-3 text-[11.5px]">
+                <form action={toggleArchiveAccount}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <button className="font-extrabold text-earth">
+                    {a.archived ? "Restore" : "Archive"}
+                  </button>
+                </form>
+                {txCount === 0 ? (
+                  <form action={deleteFinAccount}>
                     <input type="hidden" name="id" value={a.id} />
-                    <button className="font-extrabold text-earth">
-                      {a.archived ? "Restore" : "Archive"}
-                    </button>
+                    <button className="font-extrabold text-bad">Delete</button>
                   </form>
-                  {txCount === 0 ? (
-                    <form action={deleteFinAccount}>
+                ) : (
+                  <Popover
+                    trigger="Delete"
+                    triggerClass="font-extrabold text-bad text-[11.5px]"
+                    width="w-72"
+                  >
+                    <div className="text-[11px] font-bold text-inksoft">
+                      {a.name} has {txCount} transaction{txCount === 1 ? "" : "s"}. What should
+                      happen to them?
+                    </div>
+                    <form action={deleteFinAccount} className="space-y-2 border-t border-line pt-2">
                       <input type="hidden" name="id" value={a.id} />
-                      <button className="font-extrabold text-bad">Delete</button>
+                      <input type="hidden" name="mode" value="move" />
+                      <label className="block text-[10.5px] font-bold text-sagedeep">
+                        Recommended — keep the history
+                      </label>
+                      <Select
+                        name="targetAccountId"
+                        required
+                        defaultValue={accounts.find((x) => x.id !== a.id && !x.archived)?.id}
+                        options={accounts
+                          .filter((x) => x.id !== a.id && !x.archived)
+                          .map((x) => ({ value: x.id, label: x.name, icon: TYPE_ICON[x.type] }))}
+                      />
+                      <SubmitButton
+                        className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2"
+                        pendingText="Moving…"
+                      >
+                        Move history here &amp; delete
+                      </SubmitButton>
+                      <p className="text-[10px] text-inksoft">
+                        Transactions, planned items, and the {money.rp(Number(a.balance))} balance
+                        move to the chosen account.
+                      </p>
                     </form>
-                  ) : (
-                    <Popover
-                      trigger="Delete"
-                      triggerClass="font-extrabold text-bad text-[11.5px]"
-                      width="w-72"
-                    >
-                      <div className="text-[11px] font-bold text-inksoft">
-                        {a.name} has {txCount} transaction{txCount === 1 ? "" : "s"}. What should
-                        happen to them?
-                      </div>
-                      <form action={deleteFinAccount} className="space-y-2 border-t border-line pt-2">
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="mode" value="move" />
-                        <label className="block text-[10.5px] font-bold text-sagedeep">
-                          Recommended — keep the history
-                        </label>
-                        <Select
-                          name="targetAccountId"
-                          required
-                          defaultValue={accounts.find((x) => x.id !== a.id && !x.archived)?.id}
-                          options={accounts
-                            .filter((x) => x.id !== a.id && !x.archived)
-                            .map((x) => ({ value: x.id, label: x.name, icon: TYPE_ICON[x.type] }))}
-                        />
-                        <SubmitButton
-                          className="w-full bg-sagedeep text-cream2 rounded-full text-[11px] font-extrabold py-2"
-                          pendingText="Moving…"
-                        >
-                          Move history here & delete
-                        </SubmitButton>
-                        <p className="text-[10px] text-inksoft">
-                          Transactions, planned items, and the {money.rp(Number(a.balance))} balance
-                          move to the chosen account.
-                        </p>
-                      </form>
-                      <form action={deleteFinAccount} className="border-t border-line pt-2">
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="mode" value="purge" />
-                        <SubmitButton
-                          className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2"
-                          pendingText="Deleting…"
-                        >
-                          Delete account + all its transactions
-                        </SubmitButton>
-                        <p className="text-[10px] text-bad mt-1">
-                          History is removed from reports. Debt months paid from here reopen.
-                        </p>
-                      </form>
-                    </Popover>
-                  )}
-                </span>
+                    <form action={deleteFinAccount} className="border-t border-line pt-2">
+                      <input type="hidden" name="id" value={a.id} />
+                      <input type="hidden" name="mode" value="purge" />
+                      <SubmitButton
+                        className="w-full border border-bad text-bad rounded-full text-[11px] font-extrabold py-2"
+                        pendingText="Deleting…"
+                      >
+                        Delete account + all its transactions
+                      </SubmitButton>
+                      <p className="text-[10px] text-bad mt-1">
+                        History is removed from reports. Debt months paid from here reopen.
+                      </p>
+                    </form>
+                  </Popover>
+                )}
               </div>
-            </div>
+            </EditableCard>
           );
         })}
       </div>
-      <h2 className="text-sm font-bold mt-6 mb-2">Add account</h2>
-      <form action={addAccount} className="bg-card border border-line rounded-lg p-4 space-y-2.5">
-        <input type="hidden" name="backTo" value="/settings/accounts" />
-        <input
-          name="name"
-          required
-          placeholder="Account name (e.g. BCA)"
-          maxLength={40}
-          className="w-full rounded-md border border-line bg-cream2 px-3.5 py-2.5 text-sm"
-        />
-        <div className="flex gap-2.5">
-          <div className="flex-1">
-            <Select
-              name="type"
-              defaultValue="BANK"
-              options={[
-                { value: "BANK", label: "Bank", icon: "🏦" },
-                { value: "SAVINGS", label: "Savings", icon: "🌱" },
-                { value: "EWALLET", label: "E-wallet", icon: "📱" },
-                { value: "CASH", label: "Cash", icon: "💵" },
-              ]}
-            />
-          </div>
-          <div className="flex-1">
-            <MoneyInput
-              name="balance"
-              placeholder="Starting balance"
-              className="w-full rounded-md border border-line bg-cream2 px-3.5 py-3 text-sm text-right money"
-            />
-          </div>
-        </div>
-        <SubmitButton
-          className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
-          pendingText="Creating…"
-        >
-          Create account
-        </SubmitButton>
-      </form>
 
       <p className="text-[11.5px] text-inksoft mt-4">
         Hiding leaves an account out of totals and charts, but you can still transfer money to and
