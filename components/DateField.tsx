@@ -48,6 +48,51 @@ function label(value: string, mode: Mode, placeholder: string) {
   return mode === "datetime" ? `${day} · ${pad(p.hh)}:${pad(p.mm)}` : day;
 }
 
+/** Compact wrap-around number stepper — no giant native dropdown on mobile. */
+function Stepper({
+  value,
+  max,
+  label,
+  onChange,
+}: {
+  value: number;
+  max: number;
+  label: string;
+  onChange: (v: number) => void;
+}) {
+  const step = (delta: number) => onChange((value + delta + max) % max);
+  return (
+    <div className="flex flex-col items-center">
+      <button
+        type="button"
+        aria-label={`${label} up`}
+        onClick={() => step(1)}
+        className="w-9 h-6 text-inksoft leading-none"
+      >
+        ▲
+      </button>
+      <input
+        aria-label={label}
+        inputMode="numeric"
+        value={pad(value)}
+        onChange={(e) => {
+          const n = Number(e.target.value.replace(/\D/g, ""));
+          if (!Number.isNaN(n)) onChange(Math.min(max - 1, n));
+        }}
+        className="w-11 rounded-md border border-line bg-cream2 py-1 text-center text-sm font-bold"
+      />
+      <button
+        type="button"
+        aria-label={`${label} down`}
+        onClick={() => step(-1)}
+        className="w-9 h-6 text-inksoft leading-none"
+      >
+        ▼
+      </button>
+    </div>
+  );
+}
+
 export default function DateField({
   name,
   defaultValue = "",
@@ -352,31 +397,19 @@ export default function DateField({
       {mode === "datetime" && (
         <div className="flex items-center gap-2 pt-2.5 mt-2 border-t border-line">
           <span className="text-[11px] font-bold text-inksoft flex-1">Time</span>
-          <select
-            aria-label="Hour"
+          <Stepper
             value={time.hh}
-            onChange={(e) => setTime((t) => ({ ...t, hh: Number(e.target.value) }))}
-            className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-sm font-bold"
-          >
-            {Array.from({ length: 24 }, (_, h) => (
-              <option key={h} value={h}>
-                {pad(h)}
-              </option>
-            ))}
-          </select>
+            max={24}
+            label="Hour"
+            onChange={(hh) => setTime((t) => ({ ...t, hh }))}
+          />
           <span className="font-bold text-inksoft">:</span>
-          <select
-            aria-label="Minute"
+          <Stepper
             value={time.mm}
-            onChange={(e) => setTime((t) => ({ ...t, mm: Number(e.target.value) }))}
-            className="rounded-md border border-line bg-cream2 px-2 py-1.5 text-sm font-bold"
-          >
-            {Array.from({ length: 60 }, (_, m) => (
-              <option key={m} value={m}>
-                {pad(m)}
-              </option>
-            ))}
-          </select>
+            max={60}
+            label="Minute"
+            onChange={(mm) => setTime((t) => ({ ...t, mm }))}
+          />
           <button
             type="button"
             onClick={() => {

@@ -247,7 +247,7 @@ export async function askGoalAdvice(formData: FormData) {
 
   await prisma.goalMessage.create({ data: { goalId: id, role: "AI", text: advice } });
   revalidatePath(BACK);
-  back("Saku-Kun has advice for you 🌱");
+  // no redirect: keeps the user beside the goal instead of scrolling to the top
 }
 
 export async function replyToSaku(formData: FormData) {
@@ -296,7 +296,7 @@ export async function replyToSaku(formData: FormData) {
 
   await prisma.goalMessage.create({ data: { goalId: id, role: "AI", text: reply } });
   revalidatePath(BACK);
-  back("Saku-Kun replied 🌱");
+  // no redirect: returning keeps the page position and the open chat thread
 }
 
 export async function clearGoalChat(formData: FormData) {

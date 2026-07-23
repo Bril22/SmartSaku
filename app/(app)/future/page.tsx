@@ -142,16 +142,16 @@ export default async function FuturePage({
 
       {/* exact-date lookup */}
       <div className="bg-card border border-line rounded-lg p-4 mb-4">
-        <form method="GET" action="/future" className="flex items-end gap-2.5 flex-wrap">
+        <label className="block text-[11px] font-semibold text-inksoft mb-1.5">
+          🔮 Check a specific date
+        </label>
+        <form method="GET" action="/future" className="flex items-center gap-2.5">
           <input type="hidden" name="years" value={years} />
-          <div>
-            <label className="block text-[11px] font-semibold text-inksoft mb-1">
-              Check a specific date
-            </label>
+          <div className="flex-1 min-w-0">
             <DateField name="on" defaultValue={on ?? ""} required title="Check a specific date" />
           </div>
-          <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-5 py-2.5">
-            Look ahead
+          <button className="bg-sagedeep text-cream2 rounded-full text-xs font-extrabold px-5 py-3 shrink-0">
+            Apply
           </button>
         </form>
         {lookupPoint && (
