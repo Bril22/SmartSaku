@@ -345,6 +345,8 @@ model Settings {
   userId          String @id
   user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   currency        String @default("IDR")
+  /// day of month the budget period starts on (1 = calendar month)
+  monthStartDay   Int    @default(1)
   monthlyIncome   BigInt @default(0)
   monthlyExpense  BigInt @default(0)
   // long-term projection assumptions (percent per year)

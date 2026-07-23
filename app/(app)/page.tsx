@@ -3,7 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
 import { getDebtSummaries } from "@/lib/finance";
-import { monthKey, monthLabel } from "@/lib/format";
+import { addMonths, currentPeriod, monthKey, monthLabel } from "@/lib/format";
 import { getMoney } from "@/lib/money";
 import { deleteTransaction, recordPlanned } from "@/app/actions";
 import CategoryPie from "@/components/CategoryPie";
@@ -13,9 +13,16 @@ import Popover from "@/components/Popover";
 export default async function HomePage() {
   const { userId, spaceId } = await requireSpace();
   const now = monthKey();
-  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const nextMonth = addMonths(now, 1);
+  const settings = await prisma.settings.findUnique({
+    where: { userId },
+    select: { monthStartDay: true },
+  });
+  // debts and planned records stay on the calendar month; only the spending
+  // report follows the user's payday cycle
+  const period = currentPeriod(settings?.monthStartDay ?? 1);
 
-  const [user, accounts, debts, monthTx, bills, money] = await Promise.all([
+  const [user, accounts, debts, monthTx, periodTx, bills, money] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
@@ -24,6 +31,10 @@ export default async function HomePage() {
     getDebtSummaries(spaceId),
     prisma.transaction.findMany({
       where: { spaceId, date: { gte: now, lt: nextMonth }, account: { hidden: false } },
+      include: { category: true },
+    }),
+    prisma.transaction.findMany({
+      where: { spaceId, date: { gte: period.start, lt: period.end }, account: { hidden: false } },
       include: { category: true },
     }),
     prisma.plannedTransaction.findMany({
@@ -42,10 +53,10 @@ export default async function HomePage() {
   const totalDebt = debts.reduce((a, d) => a + d.remaining, 0);
   const dueThisMonth = debts.filter((d) => d.thisMonthPlanned > 0);
   const unpaid = dueThisMonth.filter((d) => d.thisMonthStatus === "DUE");
-  const incomeThisMonth = monthTx
+  const incomeThisMonth = periodTx
     .filter((t) => t.direction === "IN")
     .reduce((a, t) => a + Number(t.amount), 0);
-  const spentThisMonth = monthTx
+  const spentThisMonth = periodTx
     .filter((t) => t.direction === "OUT")
     .reduce((a, t) => a + Number(t.amount), 0);
   const freeDate = debts.reduce<Date | null>(
@@ -54,7 +65,7 @@ export default async function HomePage() {
   );
 
   const spendGroups = new Map<string, { name: string; icon: string; value: number }>();
-  for (const t of monthTx) {
+  for (const t of periodTx) {
     if (t.direction !== "OUT") continue;
     const name = t.category?.name ?? "No category";
     const g = spendGroups.get(name) ?? { name, icon: t.category?.icon ?? "🏷️", value: 0 };
@@ -68,7 +79,7 @@ export default async function HomePage() {
     orderBy: { name: "asc" },
   });
   const spentByCategory = new Map<string, number>();
-  for (const t of monthTx) {
+  for (const t of periodTx) {
     if (t.direction !== "OUT" || !t.categoryId) continue;
     spentByCategory.set(t.categoryId, (spentByCategory.get(t.categoryId) ?? 0) + Number(t.amount));
   }
@@ -125,11 +136,11 @@ export default async function HomePage() {
       {/* month in/out */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-card border border-line rounded-md p-3.5">
-          <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Income ({monthLabel(now)})</div>
+          <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Income ({period.label})</div>
           <div className="font-extrabold text-sagedeep money mt-1">+{money.rpShort(incomeThisMonth)}</div>
         </div>
         <div className="bg-card border border-line rounded-md p-3.5">
-          <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Spent ({monthLabel(now)})</div>
+          <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Spent ({period.label})</div>
           <div className="font-extrabold text-peachdeep money mt-1">−{money.rpShort(spentThisMonth)}</div>
         </div>
       </div>
@@ -137,7 +148,7 @@ export default async function HomePage() {
       {/* spending breakdown */}
       <div className="bg-card border border-line rounded-lg p-4 mb-5">
         <div className="flex items-baseline justify-between mb-2">
-          <h2 className="text-sm font-bold">Spending by category ({monthLabel(now)})</h2>
+          <h2 className="text-sm font-bold">Spending by category ({period.label})</h2>
           <Link href="/money/history" className="text-xs font-bold text-sagedeep">
             History
           </Link>
@@ -155,7 +166,7 @@ export default async function HomePage() {
       {budgeted.length > 0 && (
         <div className="bg-card border border-line rounded-lg p-4 mb-5">
           <div className="flex items-baseline justify-between mb-2.5">
-            <h2 className="text-sm font-bold">Budgets ({monthLabel(now)})</h2>
+            <h2 className="text-sm font-bold">Budgets ({period.label})</h2>
             <Link href="/settings/categories" className="text-xs font-bold text-sagedeep">
               Edit
             </Link>

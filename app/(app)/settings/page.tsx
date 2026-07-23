@@ -8,6 +8,7 @@ import {
   changePassword,
   deleteMyAccount,
   updateCurrency,
+  updateMonthStart,
   updateProfileName,
 } from "@/app/settings/actions";
 import Select from "@/components/Select";
@@ -61,6 +62,38 @@ export default async function SettingsPage() {
           pendingText="Saving…"
         >
           Apply currency
+        </SubmitButton>
+      </form>
+
+      <h2 className="text-sm font-bold mb-2">Budget month</h2>
+      <form
+        action={updateMonthStart}
+        className="bg-card border border-line rounded-lg p-4 mb-4 space-y-3"
+      >
+        <div className="flex items-center gap-3">
+          <label htmlFor="monthStartDay" className="text-sm flex-1">
+            Start my month on day
+          </label>
+          <input
+            id="monthStartDay"
+            name="monthStartDay"
+            type="number"
+            min={1}
+            max={28}
+            defaultValue={settings?.monthStartDay ?? 1}
+            className="w-20 text-center rounded-md border border-line bg-cream2 px-3 py-2.5 text-sm"
+          />
+        </div>
+        <p className="text-[11.5px] text-inksoft">
+          Set this to your payday (for example 25) so the totals on your home screen follow your
+          salary cycle. Day 1 is the plain calendar month. Your history calendar and debts stay on
+          calendar months.
+        </p>
+        <SubmitButton
+          className="rounded-full bg-sagedeep text-cream2 text-xs font-extrabold px-5 py-2.5"
+          pendingText="Saving…"
+        >
+          Apply
         </SubmitButton>
       </form>
 

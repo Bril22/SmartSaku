@@ -191,3 +191,29 @@ export function monthKey(d: Date = new Date()): Date {
 export function addMonths(m: Date, n: number): Date {
   return new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + n, 1));
 }
+
+/** clamp a stored start-day into the safe 1..28 range */
+export function normaliseStartDay(day: number): number {
+  return Math.min(28, Math.max(1, Math.round(Number(day) || 1)));
+}
+
+/**
+ * The budget period that contains `ref`, starting on `startDay` of the month.
+ * startDay = 1 is the plain calendar month. Boundaries are UTC midnights, to
+ * match how transaction dates are stored.
+ */
+export function currentPeriod(
+  startDay: number,
+  ref: Date = new Date(),
+): { start: Date; end: Date; label: string } {
+  const d = normaliseStartDay(startDay);
+  const y = ref.getFullYear();
+  const m = ref.getMonth();
+  const off = ref.getDate() >= d ? 0 : -1;
+  const start = new Date(Date.UTC(y, m + off, d));
+  const end = new Date(Date.UTC(y, m + off + 1, d));
+  if (d === 1) return { start, end, label: monthLabel(start) };
+  const last = new Date(end.getTime() - 86400000);
+  const label = `${start.getUTCDate()} ${MONTHS[start.getUTCMonth()]} – ${last.getUTCDate()} ${MONTHS[last.getUTCMonth()]}`;
+  return { start, end, label };
+}

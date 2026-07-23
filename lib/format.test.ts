@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   MINOR,
+  currentPeriod,
   evalMoneyExpr,
   formatMinor,
   hasMathOperator,
   majorToTyped,
   minorToTyped,
+  normaliseStartDay,
   normaliseTyped,
   parseMinor,
   shortMinor,
@@ -119,6 +121,43 @@ describe("inline calculator", () => {
     expect(majorToTyped(18500)).toBe("18500");
     expect(typedDisplay(majorToTyped(18500))).toBe("18.500");
     expect(typedToMinor(majorToTyped(evalMoneyExpr("15000+3500")!))).toBe("1850000");
+  });
+});
+
+describe("payday budget period", () => {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+  it("day 1 is the plain calendar month", () => {
+    const p = currentPeriod(1, new Date(2026, 6, 15));
+    expect(iso(p.start)).toBe("2026-07-01");
+    expect(iso(p.end)).toBe("2026-08-01");
+    expect(p.label).toBe("Jul 2026");
+  });
+
+  it("after payday, the period runs from this month's payday", () => {
+    const p = currentPeriod(25, new Date(2026, 6, 28));
+    expect(iso(p.start)).toBe("2026-07-25");
+    expect(iso(p.end)).toBe("2026-08-25");
+    expect(p.label).toBe("25 Jul – 24 Aug");
+  });
+
+  it("before payday, the period started last month", () => {
+    const p = currentPeriod(25, new Date(2026, 6, 10));
+    expect(iso(p.start)).toBe("2026-06-25");
+    expect(iso(p.end)).toBe("2026-07-25");
+    expect(p.label).toBe("25 Jun – 24 Jul");
+  });
+
+  it("crosses the year boundary", () => {
+    const p = currentPeriod(25, new Date(2026, 0, 3));
+    expect(iso(p.start)).toBe("2025-12-25");
+    expect(iso(p.end)).toBe("2026-01-25");
+  });
+
+  it("clamps the start day to a safe range", () => {
+    expect(normaliseStartDay(0)).toBe(1);
+    expect(normaliseStartDay(31)).toBe(28);
+    expect(normaliseStartDay(15)).toBe(15);
   });
 });
 

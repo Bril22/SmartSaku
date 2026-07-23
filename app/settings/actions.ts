@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { requireOwner, requireSpace } from "@/lib/space";
 import { createSession, destroySession, revokeSessions } from "@/lib/auth";
 import { CURRENCIES } from "@/lib/money";
+import { normaliseStartDay } from "@/lib/format";
 
 
 
@@ -244,6 +245,18 @@ export async function deleteCategory(formData: FormData) {
   await prisma.category.deleteMany({ where: { id, spaceId } });
   revalidatePath("/", "layout");
   back("/settings/categories", "Category deleted — its transactions are kept");
+}
+
+export async function updateMonthStart(formData: FormData) {
+  const { userId } = await requireSpace();
+  const day = normaliseStartDay(Number(formData.get("monthStartDay")));
+  await prisma.settings.upsert({
+    where: { userId },
+    update: { monthStartDay: day },
+    create: { userId, monthStartDay: day },
+  });
+  revalidatePath("/");
+  back("/settings", "Budget month updated");
 }
 
 const TEMPLATES = "/settings/templates";
