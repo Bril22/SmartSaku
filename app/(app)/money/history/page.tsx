@@ -71,24 +71,34 @@ export default async function HistoryPage({
       where: { spaceId, date: { gte: monthStart, lt: monthEnd }, ...matches },
       include: { category: true, account: true },
       orderBy: { date: "desc" },
+      take: 2000,
     }),
-    prisma.transaction.findMany({
+    // the pie and totals aggregate in the database, so they stay cheap no
+    // matter how many transactions the range holds
+    prisma.transaction.groupBy({
+      by: ["categoryId", "direction"],
       where: { spaceId, date: { gte: rangeStart, lt: rangeEnd }, ...matches },
-      include: { category: true },
+      _sum: { amount: true },
     }),
   ]);
 
+  const catById = new Map(
+    (await prisma.category.findMany({ where: { spaceId }, select: { id: true, name: true, icon: true } }))
+      .map((c) => [c.id, c]),
+  );
   const groups = new Map<string, PieSlice>();
   let rangeIn = 0;
   let rangeOut = 0;
-  for (const t of rangeTxs) {
-    if (t.direction === "IN") rangeIn += Number(t.amount);
-    else rangeOut += Number(t.amount);
-    if (t.direction !== kind) continue;
-    const name = t.category?.name ?? "No category";
-    const icon = t.category?.icon ?? "🏷️";
+  for (const row of rangeTxs) {
+    const amount = Number(row._sum.amount ?? 0);
+    if (row.direction === "IN") rangeIn += amount;
+    else rangeOut += amount;
+    if (row.direction !== kind) continue;
+    const cat = row.categoryId ? catById.get(row.categoryId) : null;
+    const name = cat?.name ?? "No category";
+    const icon = cat?.icon ?? "🏷️";
     const g = groups.get(name) ?? { name, icon, value: 0 };
-    g.value += Number(t.amount);
+    g.value += amount;
     groups.set(name, g);
   }
   const pieData = [...groups.values()].sort((a, b) => b.value - a.value);

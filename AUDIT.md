@@ -52,12 +52,12 @@ Database checked after the fix: no unscoped rows remain in any table.
 
 ### High
 
-2. **Links between records are plain strings, not foreign keys** (`DebtPayment.transactionId`,
-   `GoalContribution.transactionId`, `Transaction.plannedId`, `transferId`, `importBatchId`).
-   Orphans are easy to create and nothing at the database level prevents them.
-3. **History has no pagination.** The indexes now match the queries, but a month is still loaded
-   in full with its relations.
-4. **Money is `BigInt` in the database but converted to `Number` in app code.** Fine at personal
+2. **Some record links are still plain strings.** `Transaction.plannedId` and `importBatchId` are
+   now real foreign keys with `onDelete: SetNull` (one existing orphan was cleaned when they were
+   added). `DebtPayment.transactionId`, `GoalContribution.transactionId` and the `transferId`
+   grouping key are left as managed strings, because the delete flow that reopens debts and
+   restores balances has to run in application code and a naive cascade would fight it.
+3. **Money is `BigInt` in the database but converted to `Number` in app code.** Fine at personal
    scale, lossy at very large values.
 5. **No email verification and no account lockout.** Rate limiting slows an attacker down but
    does not lock a targeted account, and an address is never proven for password signups.
@@ -69,6 +69,12 @@ Database checked after the fix: no unscoped rows remain in any table.
 7. No soft deletes, and no audit trail beyond `BalanceCorrection`.
 8. No observability: no error tracking, no structured logging.
 9. Search uses unindexed `contains` across relations.
+
+### Done since
+
+- History no longer loads every row to compute the chart: the pie and the range totals aggregate
+  in the database with `groupBy`, and the calendar month query is bounded. History pagination as
+  a scrolling list is not needed, because the view is a calendar month and a per-day drill-down.
 
 ### Mobile readiness
 

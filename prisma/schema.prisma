@@ -82,8 +82,9 @@ model ImportBatch {
   space     Space?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   fileName  String
   status    String   @default("DRAFT")
-  rows      Json
-  createdAt DateTime @default(now())
+  rows         Json
+  createdAt    DateTime @default(now())
+  transactions Transaction[]
 }
 
 enum AccountType {
@@ -230,8 +231,11 @@ model Transaction {
   spaceId       String?
   space         Space?     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   plannedId     String?
+  plannedFrom   PlannedTransaction? @relation("PlannedRecorded", fields: [plannedId], references: [id], onDelete: SetNull)
   plannedMonth  DateTime?  @db.Date
   importBatchId String?
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  /// groups the two legs of a transfer; not a foreign key
   transferId    String?
   kind          TxKind    @default(NORMAL)
 
@@ -271,6 +275,7 @@ model PlannedTransaction {
   categoryId String?
   category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   active     Boolean     @default(true)
+  recorded   Transaction[] @relation("PlannedRecorded")
   /// first month this item applies to; null means it has always applied
   startMonth DateTime?   @db.Date
   /// last month it applies to; null means it repeats with no end
