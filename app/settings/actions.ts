@@ -245,3 +245,76 @@ export async function deleteCategory(formData: FormData) {
   revalidatePath("/", "layout");
   back("/settings/categories", "Category deleted — its transactions are kept");
 }
+
+const TEMPLATES = "/settings/templates";
+const templateSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  emoji: z.string().trim().min(1).max(8),
+});
+
+async function validCategory(raw: FormDataEntryValue | null, spaceId: string) {
+  const id = String(raw ?? "");
+  if (!id) return null;
+  const found = await prisma.category.findFirst({ where: { id, spaceId }, select: { id: true } });
+  return found ? id : null;
+}
+
+async function validAccount(raw: FormDataEntryValue | null, spaceId: string) {
+  const id = String(raw ?? "");
+  if (!id) return null;
+  const found = await prisma.finAccount.findFirst({ where: { id, spaceId }, select: { id: true } });
+  return found ? id : null;
+}
+
+export async function addTemplate(formData: FormData) {
+  const { userId, spaceId } = await requireSpace();
+  const parsed = templateSchema.safeParse({
+    name: formData.get("name"),
+    emoji: formData.get("emoji") || "⭐",
+  });
+  if (!parsed.success) back(TEMPLATES, "Please give the template a name", true);
+  const { name, emoji } = parsed.data!;
+  const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const categoryId = await validCategory(formData.get("categoryId"), spaceId!);
+  const accountId = await validAccount(formData.get("accountId"), spaceId!);
+  const note = String(formData.get("note") ?? "").slice(0, 120);
+  const count = await prisma.transactionTemplate.count({ where: { spaceId } });
+  await prisma.transactionTemplate.create({
+    data: { userId, spaceId, name, emoji, direction, amount: BigInt(amount), categoryId, accountId, note, sortOrder: count },
+  });
+  revalidatePath("/add");
+  back(TEMPLATES, `Template "${name}" saved`);
+}
+
+export async function updateTemplate(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  const existing = await prisma.transactionTemplate.findFirst({ where: { id, spaceId } });
+  if (!existing) back(TEMPLATES, "Template not found", true);
+  const parsed = templateSchema.safeParse({
+    name: formData.get("name"),
+    emoji: formData.get("emoji") || existing!.emoji,
+  });
+  if (!parsed.success) back(TEMPLATES, "Name cannot be empty", true);
+  const { name, emoji } = parsed.data!;
+  const direction = formData.get("direction") === "IN" ? "IN" : "OUT";
+  const amount = Math.abs(Math.round(Number(formData.get("amount") ?? 0)));
+  const categoryId = await validCategory(formData.get("categoryId"), spaceId!);
+  const accountId = await validAccount(formData.get("accountId"), spaceId!);
+  const note = String(formData.get("note") ?? "").slice(0, 120);
+  await prisma.transactionTemplate.update({
+    where: { id },
+    data: { name, emoji, direction, amount: BigInt(amount), categoryId, accountId, note },
+  });
+  revalidatePath("/add");
+  back(TEMPLATES, "Template updated");
+}
+
+export async function deleteTemplate(formData: FormData) {
+  const { spaceId } = await requireSpace();
+  const id = String(formData.get("id") ?? "");
+  await prisma.transactionTemplate.deleteMany({ where: { id, spaceId } });
+  revalidatePath("/add");
+  back(TEMPLATES, "Template removed");
+}

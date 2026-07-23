@@ -30,6 +30,7 @@ model User {
   imports      ImportBatch[]
   goals        Goal[]
   memberships  SpaceMember[]
+  templates    TransactionTemplate[]
 }
 
 model Space {
@@ -47,6 +48,7 @@ model Space {
   planned      PlannedTransaction[]
   goals        Goal[]
   imports      ImportBatch[]
+  templates    TransactionTemplate[]
 }
 
 model SpaceMember {
@@ -112,6 +114,7 @@ model FinAccount {
   transactions Transaction[]
   planned      PlannedTransaction[]
   corrections  BalanceCorrection[]
+  templates    TransactionTemplate[]
 }
 
 enum DebtStatus {
@@ -207,8 +210,30 @@ model Category {
   transactions Transaction[]
   bills        RecurringBill[]
   planned      PlannedTransaction[]
+  templates    TransactionTemplate[]
 
   @@unique([spaceId, name, type])
+}
+
+model TransactionTemplate {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId    String?
+  space      Space?      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  name       String
+  emoji      String      @default("⭐")
+  direction  Direction   @default(OUT)
+  amount     BigInt      @default(0)
+  categoryId String?
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accountId  String?
+  account    FinAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  note       String      @default("")
+  sortOrder  Int         @default(0)
+  createdAt  DateTime    @default(now())
+
+  @@index([spaceId, sortOrder])
 }
 
 enum Direction {

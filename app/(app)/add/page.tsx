@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
+import { getMoney } from "@/lib/money";
 import { addTransaction } from "@/app/actions";
-import TransactionForm, { type CategoryOption } from "@/components/TransactionForm";
+import TransactionForm, {
+  type CategoryOption,
+  type TemplateOption,
+} from "@/components/TransactionForm";
 
 export default async function AddPage({
   searchParams,
@@ -11,12 +15,18 @@ export default async function AddPage({
 }) {
   const { userId, spaceId } = await requireSpace();
   const { error } = await searchParams;
-  const [accounts, categories] = await Promise.all([
+  const [accounts, categories, templates, money] = await Promise.all([
     prisma.finAccount.findMany({
       where: { spaceId, archived: false },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.category.findMany({ where: { spaceId }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
+    prisma.transactionTemplate.findMany({
+      where: { spaceId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      take: 20,
+    }),
+    getMoney(userId),
   ]);
 
   const categoryOptions: CategoryOption[] = categories.map((c) => ({
@@ -24,6 +34,18 @@ export default async function AddPage({
     label: c.name,
     icon: c.icon,
     type: c.type,
+  }));
+
+  const templateOptions: TemplateOption[] = templates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    emoji: t.emoji,
+    direction: t.direction,
+    amount: Number(t.amount),
+    categoryId: t.categoryId,
+    accountId: t.accountId,
+    note: t.note,
+    amountLabel: money.rpShort(Number(t.amount)),
   }));
 
   return (
@@ -61,6 +83,8 @@ export default async function AddPage({
           icon: "🏦",
         }))}
         categories={categoryOptions}
+        templates={templateOptions}
+        allowTemplate
         defaults={{ accountId: (accounts.find((a) => a.primary) ?? accounts[0])?.id }}
       />
     </div>

@@ -83,6 +83,14 @@ export default async function SettingsPage() {
           <span className="flex-1 font-semibold text-[13.5px]">Manage categories</span>
           <span className="text-inksoft">›</span>
         </Link>
+        <Link href="/settings/templates" className="px-4 py-3.5 flex items-center gap-3">
+          <span className="text-lg">⭐</span>
+          <div className="flex-1">
+            <div className="font-semibold text-[13.5px]">Quick templates</div>
+            <div className="text-[11.5px] text-inksoft">One-tap entries for what you log often</div>
+          </div>
+          <span className="text-inksoft">›</span>
+        </Link>
         <a href="/api/export" className="px-4 py-3.5 flex items-center gap-3">
           <span className="text-lg">📤</span>
           <div className="flex-1">

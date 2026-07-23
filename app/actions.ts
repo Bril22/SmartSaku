@@ -108,8 +108,31 @@ export async function addTransaction(formData: FormData) {
       data: { balance: { [direction === "IN" ? "increment" : "decrement"]: BigInt(amount) } },
     }),
   ]);
+
+  if (formData.get("saveAsTemplate") === "1") {
+    const fallback = note.trim() || (direction === "IN" ? "Income" : "Expense");
+    const tName = (String(formData.get("templateName") ?? "").trim() || fallback).slice(0, 40);
+    const tEmoji = (String(formData.get("templateEmoji") ?? "").trim() || "⭐").slice(0, 8);
+    const count = await prisma.transactionTemplate.count({ where: { spaceId } });
+    await prisma.transactionTemplate.create({
+      data: {
+        userId,
+        spaceId,
+        name: tName,
+        emoji: tEmoji,
+        direction,
+        amount: BigInt(amount),
+        categoryId,
+        accountId,
+        note,
+        sortOrder: count,
+      },
+    });
+  }
+
   revalidatePath("/");
   revalidatePath("/money");
+  revalidatePath("/add");
   if (direction === "IN") {
     redirect("/money?ok=" + encodeURIComponent("Income recorded 💰") + "&fx=money");
   }
