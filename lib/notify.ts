@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { sendToUser } from "./push";
+import { notifyUser } from "./push";
 import { getDebtSummaries } from "./finance";
 
 function localHour(tz: string, now: Date): number {
@@ -92,15 +92,18 @@ export async function runReminders(now: Date): Promise<number> {
   for (const p of people) {
     if (localHour(p.notifyTz, now) !== p.notifyHour) continue;
 
-    const devices = await prisma.pushSubscription.count({ where: { userId: p.userId } });
-    if (!devices) continue;
+    const [webDevices, nativeDevices] = await Promise.all([
+      prisma.pushSubscription.count({ where: { userId: p.userId } }),
+      prisma.nativePushToken.count({ where: { userId: p.userId } }),
+    ]);
+    if (!webDevices && !nativeDevices) continue;
 
     const day = localDate(p.notifyTz, now); // YYYY-MM-DD
     const dayNum = Number(day.slice(8, 10));
     const monthStart = new Date(day.slice(0, 8) + "01T00:00:00Z");
 
     if (p.notifyDaily && (await claim(p.userId, `daily:${day}`))) {
-      sent += await sendToUser(p.userId, {
+      sent += await notifyUser(p.userId, {
         title: "Log today's spending 🌱",
         body: "A quick minute now keeps your budget honest. Tap to add.",
         url: "/add",
@@ -112,7 +115,7 @@ export async function runReminders(now: Date): Promise<number> {
       const items = await dueSummary(p.userId, dayNum, monthStart);
       if (items.length) {
         const more = items.length - 1;
-        sent += await sendToUser(p.userId, {
+        sent += await notifyUser(p.userId, {
           title: "Payment reminder 🔔",
           body: more > 0 ? `${items[0]} and ${more} more due. Tap to review.` : `${items[0]} is due. Tap to review.`,
           url: "/",

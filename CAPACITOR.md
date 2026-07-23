@@ -68,22 +68,38 @@ The JWT session cookie is set by the site and stored by the native web view, so
 sign-in and Google sign-in work inside the app the same as in a browser. No
 extra work is needed for auth.
 
-## Native push (a later step)
+## Native push (code is in place)
 
-Web Push already covers Android and iPhone-when-installed (see
-[NOTIFICATIONS.md](NOTIFICATIONS.md)). For always-on iPhone push through the App
-Store build, native push is separate and uses Apple's APNs and Google's FCM:
+The native push path is already built and uses **Firebase Cloud Messaging**
+(FCM) for both platforms — Firebase relays to Apple's APNs for iPhone, so the
+server has one send path. Web push (browser + installed PWA) keeps working
+alongside it; see [NOTIFICATIONS.md](NOTIFICATIONS.md).
 
-1. `npm i @capacitor/push-notifications`.
-2. iOS: enable Push in Xcode, create an APNs key in the Apple Developer portal.
-   Android: create a Firebase project, add `google-services.json`.
-3. On launch, register for push and send the returned **native token** to a new
-   server table (separate from the web `PushSubscription`, which holds browser
-   endpoints).
-4. Send through APNs/FCM instead of the `web-push` library.
+What is already wired:
 
-This needs real devices and the store accounts to test, so it is best done once
-the shell itself is running.
+- `components/NativePush.tsx` registers the device inside the app and stores its
+  FCM token via `POST /api/push/native` (model `NativePushToken`).
+- `lib/nativePush.ts` sends through FCM with the Firebase Admin SDK and prunes
+  dead tokens.
+- Reminders and the "Send me a test" button call `notifyUser`, which reaches
+  both web and native devices.
+
+What you set up (needs the store accounts and a device):
+
+1. **Firebase project** — create one, then add an Android app and an iOS app.
+   Download `google-services.json` (Android) and `GoogleService-Info.plist`
+   (iOS) into the native projects.
+2. **iOS APNs key** — in the Apple Developer portal create an APNs auth key
+   (`.p8`) and upload it in Firebase → Project settings → Cloud Messaging. This
+   is what lets FCM deliver to iPhones.
+3. **Server credential** — Firebase → Project settings → Service accounts →
+   Generate new private key. Put that JSON (raw or base64) in the
+   `FIREBASE_SERVICE_ACCOUNT` env var, locally and in Vercel.
+4. Add the Firebase native SDKs during `cap sync` (the
+   `@capacitor-firebase/messaging` plugin pulls them in; follow its iOS Podfile
+   and Android `google-services` steps).
+5. Build, run on a real device (push does not work in the iOS simulator), then
+   Settings → Notifications → **Send me a test**.
 
 ## Passing App Store review (guideline 4.2)
 

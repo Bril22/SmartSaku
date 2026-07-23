@@ -9,7 +9,7 @@ import { requireOwner, requireSpace } from "@/lib/space";
 import { createSession, destroySession, revokeSessions } from "@/lib/auth";
 import { CURRENCIES } from "@/lib/money";
 import { normaliseStartDay } from "@/lib/format";
-import { sendToUser } from "@/lib/push";
+import { notifyUser } from "@/lib/push";
 
 
 
@@ -285,7 +285,7 @@ export async function updateNotifyPrefs(formData: FormData) {
 
 export async function sendTestNotification() {
   const { userId } = await requireSpace();
-  const delivered = await sendToUser(userId, {
+  const delivered = await notifyUser(userId, {
     title: "SmartSaku 🌱",
     body: "Notifications are on. We will remind you about bills and daily logging.",
     url: "/",
