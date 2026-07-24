@@ -906,6 +906,7 @@ export async function recordPlanned(formData: FormData) {
       prisma.transaction.create({
         data: {
           userId,
+          spaceId,
           accountId,
           categoryId: planned!.categoryId,
           amount: planned!.amount,
