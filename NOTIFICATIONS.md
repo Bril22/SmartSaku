@@ -42,13 +42,22 @@ values in Vercel, or generate fresh ones for production.
 
 ## Turn on the schedule
 
-The cron is declared in `vercel.json`. After the next deploy, Vercel picks it up
-under **Project → Settings → Cron Jobs**.
+The cron is **removed for now** — Vercel's Hobby plan rejects any schedule that
+runs more than once a day, and the hourly `0 * * * *` made the whole deploy fail.
+The endpoint `app/api/cron/notify` still exists; only the `vercel.json` trigger
+was taken out.
 
-- **Plan note:** hourly crons need a Vercel plan that allows them. On the Hobby
-  plan crons may be limited to about once a day; if so, the per-user reminder
-  hour cannot be honored exactly — everyone is notified when the daily run fires.
-  Hourly (this config) gives each person their chosen hour.
+To switch reminders on later, add a `crons` block back to `vercel.json`:
+
+- **Pro plan:** hourly is allowed, so each person gets their chosen hour:
+  ```json
+  "crons": [{ "path": "/api/cron/notify", "schedule": "0 * * * *" }]
+  ```
+- **Hobby plan:** only once-a-day is allowed. Use a single daily run (e.g. 13:00
+  UTC = 20:00 WIB); everyone is then notified at that one time, not their own:
+  ```json
+  "crons": [{ "path": "/api/cron/notify", "schedule": "0 13 * * *" }]
+  ```
 
 ## How to verify
 
