@@ -34,7 +34,14 @@ export default async function HomePage() {
       include: { category: true },
     }),
     prisma.transaction.findMany({
-      where: { spaceId, date: { gte: period.start, lt: period.end }, account: { hidden: false } },
+      // transfers move money between your own accounts, so they are not income
+      // or spending and must be left out of the totals and category charts
+      where: {
+        spaceId,
+        date: { gte: period.start, lt: period.end },
+        account: { hidden: false },
+        kind: { not: "TRANSFER" },
+      },
       include: { category: true },
     }),
     prisma.plannedTransaction.findMany({

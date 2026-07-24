@@ -270,6 +270,7 @@ export async function transferBetweenAccounts(formData: FormData) {
         accountId: from!.id,
         amount: BigInt(amount),
         direction: "OUT",
+        kind: "TRANSFER",
         note: label,
         transferId,
         ...(when ? { date: when } : {}),
@@ -282,6 +283,7 @@ export async function transferBetweenAccounts(formData: FormData) {
         accountId: to!.id,
         amount: BigInt(amount),
         direction: "IN",
+        kind: "TRANSFER",
         note: label,
         transferId,
         ...(when ? { date: when } : {}),
@@ -318,6 +320,11 @@ export async function updateTransaction(formData: FormData) {
   const newAccount = await prisma.finAccount.findFirst({ where: { id: accountId, spaceId } });
   if (!old || !newAccount || !amount) {
     redirect(`${backTo}&err=` + encodeURIComponent("Could not update the transaction"));
+  }
+  // a transfer is a linked pair; editing one leg here would desync it. Deleting
+  // it (which removes both legs) is the only safe change from this screen.
+  if (old!.transferId || old!.kind === "TRANSFER") {
+    redirect(`${backTo}&err=` + encodeURIComponent("A transfer cannot be edited — delete it and make a new one"));
   }
   const date = dateRaw ? new Date(dateRaw + "T08:00:00Z") : old!.date;
   const oldEffect = old!.direction === "IN" ? old!.amount : -old!.amount;

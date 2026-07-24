@@ -38,8 +38,13 @@ export default async function DayPage({
     getMoney(userId),
   ]);
 
-  const income = txs.filter((t) => t.direction === "IN").reduce((a, t) => a + Number(t.amount), 0);
-  const spent = txs.filter((t) => t.direction === "OUT").reduce((a, t) => a + Number(t.amount), 0);
+  // transfers move money between own accounts — not income or spending
+  const income = txs
+    .filter((t) => t.direction === "IN" && t.kind !== "TRANSFER")
+    .reduce((a, t) => a + Number(t.amount), 0);
+  const spent = txs
+    .filter((t) => t.direction === "OUT" && t.kind !== "TRANSFER")
+    .reduce((a, t) => a + Number(t.amount), 0);
   const label = start.toLocaleDateString("en-US", {
     weekday: "long",
     day: "numeric",
@@ -83,11 +88,11 @@ export default async function DayPage({
             className="bg-card border border-line rounded-md px-3.5 py-2.5 flex items-center gap-3 hover:border-sagedeep"
           >
             <span className="text-base">
-              {t.category?.icon ?? (t.direction === "IN" ? "💰" : "💸")}
+              {t.kind === "TRANSFER" ? "⇄" : t.category?.icon ?? (t.direction === "IN" ? "💰" : "💸")}
             </span>
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-[13px] truncate">
-                {t.category?.name || t.note || "Transaction"}
+                {t.kind === "TRANSFER" ? "Transfer" : t.category?.name || t.note || "Transaction"}
               </div>
               <div className="text-[11px] text-inksoft truncate">
                 {t.date.toLocaleTimeString("en-US", {
@@ -101,10 +106,14 @@ export default async function DayPage({
             </div>
             <span
               className={`font-extrabold money text-[13px] whitespace-nowrap ${
-                t.direction === "IN" ? "text-sagedeep" : "text-peachdeep"
+                t.kind === "TRANSFER"
+                  ? "text-earth"
+                  : t.direction === "IN"
+                    ? "text-sagedeep"
+                    : "text-peachdeep"
               }`}
             >
-              {t.direction === "IN" ? "+" : "−"}
+              {t.kind === "TRANSFER" ? "⇄ " : t.direction === "IN" ? "+" : "−"}
               {money.rp(Number(t.amount))}
             </span>
           </Link>

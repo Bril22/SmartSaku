@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireSpace } from "@/lib/space";
+import { getMoney } from "@/lib/money";
 import { deleteTransaction, updateTransaction } from "@/app/actions";
 import MoneyInput from "@/components/MoneyInput";
 import Select from "@/components/Select";
@@ -28,6 +29,50 @@ export default async function EditTransactionPage({
   const monthParam = `${tx.date.getUTCFullYear()}-${String(tx.date.getUTCMonth() + 1).padStart(2, "0")}`;
   const backTo = `/money?tab=history&month=${monthParam}`;
   const dateValue = tx.date.toISOString().slice(0, 10);
+  const money = await getMoney(userId);
+
+  // a transfer is two linked rows; editing one leg here would break the pair,
+  // so show a read-only view. Delete removes both legs and restores both balances.
+  if (tx.kind === "TRANSFER" || tx.transferId) {
+    return (
+      <div className="max-w-md mx-auto">
+        <Link href={backTo} className="text-xs font-bold text-sagedeep">
+          ‹ History
+        </Link>
+        <h1 className="font-display text-2xl font-semibold mt-1 mb-5">⇄ Transfer</h1>
+        <div className="bg-card border border-line rounded-lg p-4 space-y-2 mb-4">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-inksoft">Amount</span>
+            <span className="font-display text-xl font-bold money">{money.rp(Number(tx.amount))}</span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-inksoft">Detail</span>
+            <span className="text-sm font-semibold text-right">{tx.note || "Transfer"}</span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-inksoft">Date</span>
+            <span className="text-sm">
+              {tx.date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
+            </span>
+          </div>
+        </div>
+        <p className="text-[12px] text-inksoft mb-4">
+          A transfer only moves money between your own accounts, so it is not counted as income or
+          spending. To change it, delete it and make a new transfer.
+        </p>
+        <form action={deleteTransaction}>
+          <input type="hidden" name="id" value={tx.id} />
+          <input type="hidden" name="backTo" value={backTo} />
+          <SubmitButton
+            className="w-full rounded-full border-2 border-bad text-bad font-bold py-3.5 text-sm"
+            pendingText="Deleting…"
+          >
+            Delete this transfer
+          </SubmitButton>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto">

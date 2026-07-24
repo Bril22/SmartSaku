@@ -74,10 +74,16 @@ export default async function HistoryPage({
       take: 2000,
     }),
     // the pie and totals aggregate in the database, so they stay cheap no
-    // matter how many transactions the range holds
+    // matter how many transactions the range holds. Transfers are excluded —
+    // they are not income or spending, just money moving between own accounts.
     prisma.transaction.groupBy({
       by: ["categoryId", "direction"],
-      where: { spaceId, date: { gte: rangeStart, lt: rangeEnd }, ...matches },
+      where: {
+        spaceId,
+        date: { gte: rangeStart, lt: rangeEnd },
+        kind: { not: "TRANSFER" },
+        ...matches,
+      },
       _sum: { amount: true },
     }),
   ]);
@@ -104,15 +110,19 @@ export default async function HistoryPage({
   const pieData = [...groups.values()].sort((a, b) => b.value - a.value);
   const kindTotal = kind === "IN" ? rangeIn : rangeOut;
 
-  const calTxs: CalTx[] = monthTxs.map((t) => ({
-    id: t.id,
-    day: t.date.getUTCDate(),
-    amount: Number(t.amount),
-    direction: t.direction,
-    icon: t.category?.icon ?? (t.direction === "IN" ? "💰" : "💸"),
-    title: t.category?.name || t.note || "Transaction",
-    sub: `${t.account.name}${t.note && t.category ? " · " + t.note : ""}`,
-  }));
+  const calTxs: CalTx[] = monthTxs.map((t) => {
+    const isTransfer = t.kind === "TRANSFER";
+    return {
+      id: t.id,
+      day: t.date.getUTCDate(),
+      amount: Number(t.amount),
+      direction: t.direction,
+      icon: isTransfer ? "⇄" : t.category?.icon ?? (t.direction === "IN" ? "💰" : "💸"),
+      title: isTransfer ? "Transfer" : t.category?.name || t.note || "Transaction",
+      sub: `${t.account.name}${t.note && t.category ? " · " + t.note : ""}`,
+      isTransfer,
+    };
+  });
 
   const prevMonth = `${month === 0 ? year - 1 : year}-${String(month === 0 ? 12 : month).padStart(2, "0")}`;
   const nextMonth = `${month === 11 ? year + 1 : year}-${String(month === 11 ? 1 : month + 2).padStart(2, "0")}`;

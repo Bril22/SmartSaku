@@ -65,7 +65,11 @@ export async function GET() {
       transactions.map((t) => [
         day(t.date),
         t.date.toISOString().slice(11, 16),
-        t.direction === "IN" ? "Income" : "Expense",
+        t.kind === "TRANSFER" || t.transferId
+          ? "Transfer"
+          : t.direction === "IN"
+            ? "Income"
+            : "Expense",
         money(t.amount),
         t.category?.name ?? "",
         t.account.name,

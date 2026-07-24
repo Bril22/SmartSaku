@@ -12,6 +12,7 @@ export type CalTx = {
   icon: string;
   title: string;
   sub: string;
+  isTransfer?: boolean;
 };
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -70,8 +71,9 @@ export default function CalendarHistory({
         ))}
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
           const has = byDay.get(day);
-          const hasIn = has?.some((t) => t.direction === "IN");
-          const hasOut = has?.some((t) => t.direction === "OUT");
+          const hasIn = has?.some((t) => t.direction === "IN" && !t.isTransfer);
+          const hasOut = has?.some((t) => t.direction === "OUT" && !t.isTransfer);
+          const hasTransfer = has?.some((t) => t.isTransfer);
           const isToday = isThisMonth && day === today.getDate();
           return (
             <button
@@ -89,6 +91,7 @@ export default function CalendarHistory({
               <span className="flex gap-0.5 h-1.5">
                 {hasIn && <span className={`w-1.5 h-1.5 rounded-full ${selected === day ? "bg-sun" : "bg-leaf"}`} />}
                 {hasOut && <span className={`w-1.5 h-1.5 rounded-full ${selected === day ? "bg-peach" : "bg-peachdeep"}`} />}
+                {hasTransfer && <span className={`w-1.5 h-1.5 rounded-full ${selected === day ? "bg-cream2" : "bg-earth"}`} />}
               </span>
             </button>
           );
@@ -120,9 +123,11 @@ export default function CalendarHistory({
               <div className="text-[11px] text-inksoft truncate">{t.sub}</div>
             </div>
             <span
-              className={`font-extrabold money text-[13px] ${t.direction === "IN" ? "text-sagedeep" : "text-peachdeep"}`}
+              className={`font-extrabold money text-[13px] ${
+                t.isTransfer ? "text-earth" : t.direction === "IN" ? "text-sagedeep" : "text-peachdeep"
+              }`}
             >
-              {t.direction === "IN" ? "+" : "−"}
+              {t.isTransfer ? "⇄ " : t.direction === "IN" ? "+" : "−"}
               {fmt(t.amount)}
             </span>
             <span className="text-inksoft text-xs">✎</span>
